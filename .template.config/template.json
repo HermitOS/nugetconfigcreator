@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Your Name",
+  "classifications": [ "Config", "NuGet" ],
+  "identity": "NugetConfigCreator.Template",
+  "name": "NuGet Config Creator",
+  "shortName": "nugetc",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "NugetConfigCreator",
+  "preferNameDirectory": true,
+  "symbols": {
+    "configType": {
+      "type": "parameter",
+      "description": "The type of NuGet configuration to create",
+      "datatype": "choice",
+      "choices": [
+        {
+          "choice": "standard",
+          "description": "Standard configuration with only nuget.org feed"
+        },
+        {
+          "choice": "local",
+          "description": "Configuration with local feed"
+        },
+        {
+          "choice": "myget",
+          "description": "Configuration with MyGet.org feed"
+        }
+      ],
+      "defaultValue": "standard"
+    },
+    "localPath": {
+      "type": "parameter",
+      "description": "Path to the local NuGet feed (only used with local config type)",
+      "defaultValue": "C:\\nuget",
+      "condition": "(configType == \"local\")"
+    }
+  }
+}

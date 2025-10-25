@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+    <!--#if (configType == "local")-->
+    <add key="Local" value="<!--#echo localPath-->" />
+    <!--#endif-->
+    <!--#if (configType == "myget")-->
+    <add key="MyGet" value="https://www.myget.org/F/your-feed/api/v3/index.json" />
+    <!--#endif-->
+  </packageSources>
+</configuration>
