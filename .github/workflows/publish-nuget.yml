@@ -19,7 +19,7 @@ jobs:
       run: dotnet restore
     
     - name: Build
-      run: dotnet build --configuration Release --no-restore
+      run: dotnet build nugetconfigcreator.csproj --configuration Release --no-restore
     
     - name: Pack
       run: dotnet pack --configuration Release --no-build --output ./artifacts
