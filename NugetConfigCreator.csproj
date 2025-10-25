@@ -12,6 +12,9 @@
     <Authors>Terje Sandstrom</Authors>
     <Copyright>Copyright © 2025 Terje Sandstrom</Copyright>
     <Description>A .NET tool for creating NuGet.config files with different feed configurations</Description>
+    <!-- Ensure README and LICENSE are surfaced on NuGet.org -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,6 +28,9 @@
     <None Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Pack README and LICENSE into the NuGet package root -->
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="LICENSE" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>
