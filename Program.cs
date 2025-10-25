@@ -203,14 +203,14 @@ class Program
     private static void ShowUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine($"  nugetconfigcreator                    - Create standard config (default)");
-        Console.WriteLine($"  nugetconfigcreator {_appSettings!.NuGetFeeds.Local.Command,-10} - Create config with local feed");
-        Console.WriteLine($"  nugetconfigcreator {_appSettings!.NuGetFeeds.MyGet.Command,-10} - Create config with MyGet feed");
+        Console.WriteLine($"  nugetc                    - Create standard config (default)");
+        Console.WriteLine($"  nugetc {_appSettings!.NuGetFeeds.Local.Command,-10} - Create config with local feed");
+        Console.WriteLine($"  nugetc {_appSettings!.NuGetFeeds.MyGet.Command,-10} - Create config with MyGet feed");
         Console.WriteLine();
         Console.WriteLine("Management Commands:");
-        Console.WriteLine("  nugetconfigcreator remove --key <key>  - Remove a key from existing config");
-        Console.WriteLine("  nugetconfigcreator disable --key <key> - Disable a key (comment out)");
-        Console.WriteLine("  nugetconfigcreator enable --key <key>  - Enable a key (uncomment)");
+        Console.WriteLine("  nugetc remove --key <key>  - Remove a key from existing config");
+        Console.WriteLine("  nugetc disable --key <key> - Disable a key (comment out)");
+        Console.WriteLine("  nugetc enable --key <key>  - Enable a key (uncomment)");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine($"  --path <path>  - Specify local feed path (default: {_appSettings!.NuGetFeeds.Local.DefaultPath})");

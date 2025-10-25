@@ -26,26 +26,29 @@ This isn't just another boring configuration generator - this is a **game-change
 ### 🚀 **Real-World Usage Scenarios**
 
 **Debugging Workflow:**
+
 ```bash
-nugetconfigcreator myget                    # Add debug feed
+nugetc myget                    # Add debug feed, myget is in the config, so we know the url
 # ... do your debugging magic ...
-nugetconfigcreator disable --key MyGet      # Temporarily disable
+nugetc disable --key MyGet      # Temporarily disable
 # ... continue development ...
-nugetconfigcreator enable --key MyGet       # Re-enable when needed
-nugetconfigcreator remove --key MyGet       # Clean up when done
+nugetc enable --key MyGet       # Re-enable when needed
+nugetc remove --key MyGet       # Clean up when done
 ```
 
 **Team Development:**
+
 ```bash
-nugetconfigcreator local --path "D:\TeamFeed"  # Add team feed
+nugetc local --path "D:\TeamFeed"  # Add team feed
 # ... collaborate with team ...
-nugetconfigcreator remove --key Local          # Clean up
+nugetc remove --key Local          # Clean up
 ```
 
 **Smart Duplicate Prevention:**
+
 ```bash
-nugetconfigcreator myget    # First time: "NuGet.config with MyGet.org feed created successfully!"
-nugetconfigcreator myget    # Second time: "NuGet.config already exists and contains the 'MyGet' key."
+nugetc myget    # First time: "NuGet.config with MyGet.org feed created successfully!"
+nugetc myget    # Second time: "NuGet.config already exists and contains the 'MyGet' key."
 ```
 
 ### 🎉 **What You Get**
@@ -53,7 +56,8 @@ nugetconfigcreator myget    # Second time: "NuGet.config already exists and cont
 When you run this tool, you'll get a **beautifully formatted, production-ready NuGet.config** file that includes:
 
 - ✅ **Official NuGet.org feed** with proper protocol versioning
-- ✅ **Custom feed sources** (MyGet, local feeds, company repositories)
+- ✅ **Two extra feeds** one for a local feed at C:\nuget, and one for NUnit's myget feed. (Yeah, we love NUnit)
+- ✅ **Custom feed sources** Add any feed you like, MyGet, Azure Devops, Github, local feeds, company reposits.
 - ✅ **Clean XML structure** that follows Microsoft's best practices
 - ✅ **Proper configuration** that works with all NuGet clients
 - ✅ **No more typos** or missing attributes in your config files!
@@ -66,10 +70,8 @@ When you run this tool, you'll get a **beautifully formatted, production-ready N
 ## Installation
 
 ```bash
-dotnet tool install --global NugetConfigCreator
+dotnet tool install --global nugetc
 ```
-
-**Note**: This tool needs to be published to NuGet.org first. For development/testing, build locally and install with `--add-source ./bin/Debug`.
 
 ## Usage
 
@@ -79,29 +81,29 @@ After installation, you can use the tool with the following commands:
 
 ```bash
 # Create a standard NuGet.config with only nuget.org feed (default)
-nugetconfigcreator
+nugetc
 
-# Create a NuGet.config with local feed (default path: C:\nuget)
-nugetconfigcreator local
+# Create or add to a NuGet.config with local feed (default path: C:\nuget) 
+nugetc local
 
-# Create a NuGet.config with local feed at custom path
-nugetconfigcreator local --path "D:\MyNuGetFeed"
+# Create or add to, or modify a NuGet.config with local feed at custom path
+nugetc local --path "D:\MyNuGetFeed"
 
-# Create a NuGet.config with MyGet.org feed
-nugetconfigcreator myget
+# Create or add to a NuGet.config with MyGet.org feed
+nugetc myget
 ```
 
 ### 🛠️ **Management Commands - The Game Changers!**
 
 ```bash
 # Remove a key from existing NuGet.config
-nugetconfigcreator remove --key MyGet
+nugetc remove --key MyGet
 
 # Temporarily disable a key (comments it out)
-nugetconfigcreator disable --key MyGet
+nugetc disable --key MyGet
 
 # Re-enable a disabled key (uncomments it)
-nugetconfigcreator enable --key MyGet
+nugetc enable --key MyGet
 ```
 
 ### As a dotnet new template
@@ -120,7 +122,7 @@ dotnet new nugetc --configType myget
 
 ## Configuration Types
 
-1. **Standard**: Creates a basic NuGet.config with only the official nuget.org feed
+1. **Standard**: Creates a basic NuGet.config with only the official nuget.org feed. This is the default, so you rarely need to specify standard.
 2. **Local**: Adds a local feed source (default: C:\nuget, customizable via --path parameter)
 3. **MyGet**: Adds MyGet.org feed source (NUnit feed)
 
@@ -130,6 +132,24 @@ dotnet new nugetc --configType myget
 - **Subsequent Runs**: Adds the feed to existing config (if not already present)
 - **Duplicate Detection**: Informs you if the key already exists
 - **No Overwrites**: Always preserves your existing configuration
+
+## Add more Custom feeds
+
+You can add your own feeds, if three feeds are not enough for you.
+
+E.g. a github package feed:
+
+```bash
+nugetc add github --path "https://nuget.pkg.github.com/NAMESPACE/index.json"
+```
+
+and then you can use the command
+
+```bash
+nugetc github
+```
+
+and add that feed to your nuget.config files ! 
 
 ## Configuration
 
