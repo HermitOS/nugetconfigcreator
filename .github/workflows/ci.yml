@@ -19,12 +19,12 @@ jobs:
         dotnet-version: 8.0.x
     
     - name: Restore dependencies
-      run: dotnet restore nugetconfigcreator.csproj
+      run: dotnet restore NugetConfigCreator.csproj
     
     - name: Build
-      run: dotnet build nugetconfigcreator.csproj --configuration Release --no-restore
+      run: dotnet build NugetConfigCreator.csproj --configuration Release --no-restore
     
     - name: Pack
-      run: dotnet pack nugetconfigcreator.csproj --configuration Release --no-build --output ./artifacts
+      run: dotnet pack NugetConfigCreator.csproj --configuration Release --no-build --output ./artifacts
     
 
