@@ -13,6 +13,8 @@ public class NuGetFeedsConfig
     public NuGetFeedConfig NuGetOrg { get; set; } = new();
     public NuGetFeedConfig MyGet { get; set; } = new();
     public LocalFeedConfig Local { get; set; } = new();
+    // Additional custom feeds defined by users at runtime
+    public Dictionary<string, NuGetFeedConfig> Custom { get; set; } = new();
 }
 
 public class LocalFeedConfig

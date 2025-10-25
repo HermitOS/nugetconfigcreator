@@ -1,4 +1,6 @@
 using System.CommandLine;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using NugetConfigCreator.Templates;
 using NugetConfigCreator.Configuration;
@@ -15,21 +17,15 @@ class Program
         // Load configuration
         LoadConfiguration();
 
-        var rootCommand = new RootCommand("NuGet Config Creator - A tool for generating NuGet.config files");
+    var rootCommand = new RootCommand("NuGet Config Creator - Generate and manage NuGet.config feeds");
 
         // Create commands dynamically from configuration
         CreateDynamicCommands(rootCommand);
 
-        // Handle direct execution without subcommand - create standard config by default
+        // No parameters: show help (no side effects)
         if (args.Length == 0)
         {
-            var template = new StandardNuGetConfigTemplate(_appSettings!.NuGetFeeds);
-            var config = template.GenerateConfig();
-            File.WriteAllText("NuGet.config", config);
-            Console.WriteLine("Standard NuGet.config created successfully!");
-            Console.WriteLine();
-            ShowUsage();
-            return 0;
+            return await rootCommand.InvokeAsync("--help");
         }
 
         return await rootCommand.InvokeAsync(args);
@@ -37,9 +33,16 @@ class Program
 
     private static void CreateDynamicCommands(RootCommand rootCommand)
     {
-        // Standard command (always available)
-        var standardCommand = new Command(_appSettings!.NuGetFeeds.NuGetOrg.Command, "Create a standard NuGet.config with only nuget.org feed");
-        standardCommand.SetHandler(() =>
+        // Parent 'add' command for adding feeds
+        var addCommand = new Command("add", "Add a feed to NuGet.config (creates file if missing)");
+
+        // Standard (nuget.org) subcommand
+        var standardCommand = new Command(_appSettings!.NuGetFeeds.NuGetOrg.Command, "Add nuget.org feed (or create standard config if missing)");
+        // Alias 'default' for convenience: `nugetc add default`
+        standardCommand.AddAlias("default");
+
+        // Define the standard handler once so we can reuse it for aliases and the 'create' command
+        Action standardHandler = () =>
         {
             var manager = new NuGetConfigManager();
             if (manager.ConfigExists)
@@ -60,11 +63,13 @@ class Program
                 File.WriteAllText("NuGet.config", config);
                 Console.WriteLine("Standard NuGet.config created successfully!");
             }
-        });
-        rootCommand.AddCommand(standardCommand);
+        };
+
+        standardCommand.SetHandler(standardHandler);
+        addCommand.AddCommand(standardCommand);
 
         // Local feed command
-        var localCommand = new Command(_appSettings!.NuGetFeeds.Local.Command, "Create a NuGet.config with local feed");
+    var localCommand = new Command(_appSettings!.NuGetFeeds.Local.Command, "Add local feed (or create config with local feed)");
         var localPathOption = new Option<string>(
             name: "--path",
             description: "Path to the local NuGet feed",
@@ -93,10 +98,10 @@ class Program
                 Console.WriteLine($"NuGet.config with local feed ({path}) created successfully!");
             }
         }, localPathOption);
-        rootCommand.AddCommand(localCommand);
+    addCommand.AddCommand(localCommand);
 
         // MyGet command
-        var mygetCommand = new Command(_appSettings!.NuGetFeeds.MyGet.Command, "Create a NuGet.config with MyGet.org feed");
+    var mygetCommand = new Command(_appSettings!.NuGetFeeds.MyGet.Command, "Add MyGet.org feed (or create config with MyGet)");
         mygetCommand.SetHandler(() =>
         {
             var manager = new NuGetConfigManager();
@@ -119,7 +124,462 @@ class Program
                 Console.WriteLine("NuGet.config with MyGet.org feed created successfully!");
             }
         });
-        rootCommand.AddCommand(mygetCommand);
+    addCommand.AddCommand(mygetCommand);
+
+    // Register 'add' at root
+    rootCommand.AddCommand(addCommand);
+
+    // Top-level 'create' command that mirrors 'add default'
+    var createCommand = new Command("create", "Create a standard NuGet.config (same as 'add default')");
+    createCommand.SetHandler(standardHandler);
+    rootCommand.AddCommand(createCommand);
+
+        // Dynamically add commands for any custom feeds defined in appsettings.json
+        if (_appSettings!.NuGetFeeds.Custom != null && _appSettings!.NuGetFeeds.Custom.Count > 0)
+        {
+            foreach (var kvp in _appSettings!.NuGetFeeds.Custom)
+            {
+                var customName = kvp.Key; // logical name
+                var feed = kvp.Value;
+                if (string.IsNullOrWhiteSpace(feed.Command) || string.IsNullOrWhiteSpace(feed.Url) || string.IsNullOrWhiteSpace(feed.Key))
+                {
+                    continue; // skip incomplete entries
+                }
+
+                // Avoid collisions with built-ins
+                var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    _appSettings!.NuGetFeeds.NuGetOrg.Command,
+                    _appSettings!.NuGetFeeds.Local.Command,
+                    _appSettings!.NuGetFeeds.MyGet.Command,
+                    "add", "remove", "disable", "enable", "create", "config"
+                };
+                if (reserved.Contains(feed.Command))
+                    continue;
+
+                var customCommand = new Command(feed.Command, $"Add {customName} feed (from configuration)");
+                customCommand.SetHandler(() =>
+                {
+                    var manager = new NuGetConfigManager();
+                    if (manager.ConfigExists)
+                    {
+                        if (manager.KeyExists(feed.Key))
+                        {
+                            Console.WriteLine($"NuGet.config already exists and contains the '{feed.Key}' key.");
+                            return;
+                        }
+                        manager.AddOrUpdateKey(feed.Key, feed.Url, feed.ProtocolVersion);
+                        manager.SaveConfig();
+                        Console.WriteLine($"Added '{feed.Key}' key to existing NuGet.config!");
+                    }
+                    else
+                    {
+                        // Create base with NuGet.org, then add custom
+                        var template = new StandardNuGetConfigTemplate(_appSettings!.NuGetFeeds);
+                        var configXml = template.GenerateConfig();
+                        File.WriteAllText("NuGet.config", configXml);
+                        var manager2 = new NuGetConfigManager();
+                        manager2.AddOrUpdateKey(feed.Key, feed.Url, feed.ProtocolVersion);
+                        manager2.SaveConfig();
+                        Console.WriteLine($"NuGet.config with {customName} feed created successfully!");
+                    }
+                });
+                addCommand.AddCommand(customCommand);
+            }
+        }
+
+        // 'config' command group for managing appsettings.json custom feeds
+        var configCommand = new Command("config", "Manage tool configuration (appsettings.json)");
+        var configAdd = new Command("add", "Add or update a custom feed in appsettings.json");
+        var nameOpt = new Option<string>("--name", description: "Logical feed name (e.g., GitHub)") { IsRequired = true };
+        var cmdOpt = new Option<string>("--command", description: "CLI command to add this feed (e.g., github)") { IsRequired = true };
+        var urlOpt = new Option<string>("--url", description: "Feed URL (e.g., https://nuget.pkg.github.com/ORG/index.json)") { IsRequired = true };
+        var protoOpt = new Option<string?>("--protocol-version", () => null, description: "Optional protocol version (e.g., 3)");
+        configAdd.AddOption(nameOpt);
+        configAdd.AddOption(cmdOpt);
+        configAdd.AddOption(urlOpt);
+        configAdd.AddOption(protoOpt);
+        configAdd.SetHandler((string name, string command, string url, string? protocol) =>
+        {
+            var path = GetAppSettingsPath();
+            var settings = LoadAppSettingsFromFile(path);
+            settings.NuGetFeeds.Custom ??= new();
+
+            // Prevent collisions with built-in commands
+            var builtins = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                settings.NuGetFeeds.NuGetOrg.Command,
+                settings.NuGetFeeds.Local.Command,
+                settings.NuGetFeeds.MyGet.Command,
+                "add", "remove", "disable", "enable", "create", "config", "default", "standard"
+            };
+            if (builtins.Contains(command))
+            {
+                Console.WriteLine($"Command '{command}' conflicts with a built-in command. Choose another.");
+                return;
+            }
+
+            settings.NuGetFeeds.Custom[name] = new NuGetFeedConfig
+            {
+                Key = name,
+                Command = command,
+                Url = url,
+                ProtocolVersion = protocol
+            };
+            SaveAppSettingsToFile(path, settings);
+            Console.WriteLine($"Added/updated custom feed '{name}' with command '{command}'. Restart the tool to use 'nugetc add {command}'.");
+        }, nameOpt, cmdOpt, urlOpt, protoOpt);
+
+        var configRemove = new Command("remove", "Remove a custom feed from appsettings.json");
+        var nameOrCmdOpt = new Option<string>("--name", description: "Logical feed name to remove (or use --command)");
+        var byCmdOpt = new Option<string>("--command", description: "Command name to remove (or use --name)");
+        configRemove.AddOption(nameOrCmdOpt);
+        configRemove.AddOption(byCmdOpt);
+        configRemove.SetHandler((string name, string command) =>
+        {
+            var path = GetAppSettingsPath();
+            var settings = LoadAppSettingsFromFile(path);
+            if (settings.NuGetFeeds.Custom == null || settings.NuGetFeeds.Custom.Count == 0)
+            {
+                Console.WriteLine("No custom feeds configured.");
+                return;
+            }
+
+            string? toRemoveKey = null;
+            if (!string.IsNullOrWhiteSpace(name) && settings.NuGetFeeds.Custom.ContainsKey(name))
+            {
+                toRemoveKey = name;
+            }
+            else if (!string.IsNullOrWhiteSpace(command))
+            {
+                var match = settings.NuGetFeeds.Custom.FirstOrDefault(kv => string.Equals(kv.Value.Command, command, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(match.Key))
+                {
+                    toRemoveKey = match.Key;
+                }
+            }
+
+            if (toRemoveKey == null)
+            {
+                Console.WriteLine("Custom feed not found. Specify --name or --command matching a custom entry.");
+                return;
+            }
+
+            settings.NuGetFeeds.Custom.Remove(toRemoveKey);
+            SaveAppSettingsToFile(path, settings);
+            Console.WriteLine($"Removed custom feed '{toRemoveKey}'. Restart the tool for changes to take effect.");
+        }, nameOrCmdOpt, byCmdOpt);
+
+        configCommand.AddCommand(configAdd);
+        configCommand.AddCommand(configRemove);
+        
+        // List custom feeds
+        var configList = new Command("list", "List configured feeds (built-in and custom)");
+        configList.SetHandler(() =>
+        {
+            var path = GetAppSettingsPath();
+            var settings = LoadAppSettingsFromFile(path);
+
+            Console.WriteLine("Built-in feeds:");
+            Console.WriteLine($"  standard/default -> key='{settings.NuGetFeeds.NuGetOrg.Key}', cmd='{settings.NuGetFeeds.NuGetOrg.Command}', url='{settings.NuGetFeeds.NuGetOrg.Url}'");
+            Console.WriteLine($"  local            -> key='{settings.NuGetFeeds.Local.Key}', cmd='{settings.NuGetFeeds.Local.Command}', defaultPath='{settings.NuGetFeeds.Local.DefaultPath}'");
+            Console.WriteLine($"  myget            -> key='{settings.NuGetFeeds.MyGet.Key}', cmd='{settings.NuGetFeeds.MyGet.Command}', url='{settings.NuGetFeeds.MyGet.Url}'");
+            Console.WriteLine();
+
+            Console.WriteLine("Custom feeds:");
+            if (settings.NuGetFeeds.Custom != null && settings.NuGetFeeds.Custom.Count > 0)
+            {
+                foreach (var kv in settings.NuGetFeeds.Custom)
+                {
+                    var f = kv.Value;
+                    Console.WriteLine($"  {kv.Key} -> key='{f.Key}', cmd='{f.Command}', url='{f.Url}'");
+                }
+            }
+            else
+            {
+                Console.WriteLine("  (none)");
+            }
+        });
+        configCommand.AddCommand(configList);
+
+        // Rename custom feed (name and/or command)
+        var configRename = new Command("rename", "Rename a custom feed's name and/or command");
+        var selNameOpt = new Option<string>("--name", description: "Existing logical feed name to update");
+        var selCommandOpt = new Option<string>("--command", description: "Existing command to update");
+        var newNameOpt = new Option<string>("--new-name", description: "New logical feed name (updates Key and dictionary key)");
+        var newCommandOpt = new Option<string>("--new-command", description: "New CLI command name");
+        configRename.AddOption(selNameOpt);
+        configRename.AddOption(selCommandOpt);
+        configRename.AddOption(newNameOpt);
+        configRename.AddOption(newCommandOpt);
+        configRename.SetHandler((string selName, string selCommand, string newName, string newCommand) =>
+        {
+            if (string.IsNullOrWhiteSpace(selName) && string.IsNullOrWhiteSpace(selCommand))
+            {
+                Console.WriteLine("Specify either --name or --command to select the custom feed to rename.");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(newName) && string.IsNullOrWhiteSpace(newCommand))
+            {
+                Console.WriteLine("Specify at least one of --new-name or --new-command.");
+                return;
+            }
+
+            var path = GetAppSettingsPath();
+            var settings = LoadAppSettingsFromFile(path);
+            if (settings.NuGetFeeds.Custom == null || settings.NuGetFeeds.Custom.Count == 0)
+            {
+                Console.WriteLine("No custom feeds configured.");
+                return;
+            }
+
+            string? key = null;
+            if (!string.IsNullOrWhiteSpace(selName) && settings.NuGetFeeds.Custom.ContainsKey(selName))
+            {
+                key = selName;
+            }
+            else if (!string.IsNullOrWhiteSpace(selCommand))
+            {
+                var match = settings.NuGetFeeds.Custom.FirstOrDefault(kv => string.Equals(kv.Value.Command, selCommand, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(match.Key)) key = match.Key;
+            }
+
+            if (key == null)
+            {
+                Console.WriteLine("Custom feed not found for the given selector.");
+                return;
+            }
+
+            var feed = settings.NuGetFeeds.Custom[key];
+
+            var builtinCommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                settings.NuGetFeeds.NuGetOrg.Command,
+                settings.NuGetFeeds.Local.Command,
+                settings.NuGetFeeds.MyGet.Command,
+                "add", "remove", "disable", "enable", "create", "config", "default", "standard"
+            };
+
+            if (!string.IsNullOrWhiteSpace(newCommand))
+            {
+                if (builtinCommands.Contains(newCommand) || settings.NuGetFeeds.Custom.Values.Any(v => string.Equals(v.Command, newCommand, StringComparison.OrdinalIgnoreCase)))
+                {
+                    Console.WriteLine($"Cannot rename: command '{newCommand}' is reserved or already in use.");
+                    return;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(newName))
+            {
+                var builtinKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    settings.NuGetFeeds.NuGetOrg.Key,
+                    settings.NuGetFeeds.Local.Key,
+                    settings.NuGetFeeds.MyGet.Key
+                };
+                if (builtinKeys.Contains(newName) || settings.NuGetFeeds.Custom.ContainsKey(newName))
+                {
+                    Console.WriteLine($"Cannot rename: name '{newName}' already exists.");
+                    return;
+                }
+
+                settings.NuGetFeeds.Custom.Remove(key);
+                feed.Key = newName;
+                settings.NuGetFeeds.Custom[newName] = feed;
+                key = newName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(newCommand))
+            {
+                feed.Command = newCommand;
+            }
+
+            SaveAppSettingsToFile(path, settings);
+            Console.WriteLine("Custom feed updated. Restart the tool for command changes to take effect.");
+        }, selNameOpt, selCommandOpt, newNameOpt, newCommandOpt);
+
+        configCommand.AddCommand(configRename);
+
+        // Show details of a single feed
+        var configShow = new Command("show", "Show details of a specific feed in JSON format");
+        var showNameOpt = new Option<string>("--name", description: "Logical feed name to show (or use --command)");
+        var showCmdOpt = new Option<string>("--command", description: "Command name to show (or use --name)");
+        configShow.AddOption(showNameOpt);
+        configShow.AddOption(showCmdOpt);
+        configShow.SetHandler((string name, string command) =>
+        {
+            var path = GetAppSettingsPath();
+            var settings = LoadAppSettingsFromFile(path);
+
+            NuGetFeedConfig? feedToShow = null;
+            string feedType = "";
+
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                if (string.Equals(name, settings.NuGetFeeds.NuGetOrg.Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    feedToShow = settings.NuGetFeeds.NuGetOrg;
+                    feedType = "Built-in (NuGet.org)";
+                }
+                else if (string.Equals(name, settings.NuGetFeeds.MyGet.Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    feedToShow = settings.NuGetFeeds.MyGet;
+                    feedType = "Built-in (MyGet)";
+                }
+                else if (string.Equals(name, settings.NuGetFeeds.Local.Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"Feed: {settings.NuGetFeeds.Local.Key} (Built-in - Local)");
+                    Console.WriteLine(JsonSerializer.Serialize(settings.NuGetFeeds.Local, new JsonSerializerOptions { WriteIndented = true }));
+                    return;
+                }
+                else if (settings.NuGetFeeds.Custom?.ContainsKey(name) == true)
+                {
+                    feedToShow = settings.NuGetFeeds.Custom[name];
+                    feedType = "Custom";
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(command))
+            {
+                if (string.Equals(command, settings.NuGetFeeds.NuGetOrg.Command, StringComparison.OrdinalIgnoreCase))
+                {
+                    feedToShow = settings.NuGetFeeds.NuGetOrg;
+                    feedType = "Built-in (NuGet.org)";
+                }
+                else if (string.Equals(command, settings.NuGetFeeds.MyGet.Command, StringComparison.OrdinalIgnoreCase))
+                {
+                    feedToShow = settings.NuGetFeeds.MyGet;
+                    feedType = "Built-in (MyGet)";
+                }
+                else if (string.Equals(command, settings.NuGetFeeds.Local.Command, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"Feed: {settings.NuGetFeeds.Local.Key} (Built-in - Local)");
+                    Console.WriteLine(JsonSerializer.Serialize(settings.NuGetFeeds.Local, new JsonSerializerOptions { WriteIndented = true }));
+                    return;
+                }
+                else if (settings.NuGetFeeds.Custom != null)
+                {
+                    var match = settings.NuGetFeeds.Custom.FirstOrDefault(kv => string.Equals(kv.Value.Command, command, StringComparison.OrdinalIgnoreCase));
+                    if (!string.IsNullOrEmpty(match.Key))
+                    {
+                        feedToShow = match.Value;
+                        feedType = "Custom";
+                    }
+                }
+            }
+
+            if (feedToShow == null)
+            {
+                Console.WriteLine("Feed not found. Specify --name or --command matching an existing feed.");
+                return;
+            }
+
+            Console.WriteLine($"Feed: {feedToShow.Key} ({feedType})");
+            Console.WriteLine(JsonSerializer.Serialize(feedToShow, new JsonSerializerOptions { WriteIndented = true }));
+        }, showNameOpt, showCmdOpt);
+        configCommand.AddCommand(configShow);
+
+        // Validate configuration for collisions and issues
+        var configValidate = new Command("validate", "Validate configuration for collisions and invalid URLs");
+        configValidate.SetHandler(() =>
+        {
+            var path = GetAppSettingsPath();
+            var settings = LoadAppSettingsFromFile(path);
+
+            Console.WriteLine("Validating configuration...");
+            Console.WriteLine();
+
+            var issues = new List<string>();
+            var builtinCommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                settings.NuGetFeeds.NuGetOrg.Command,
+                settings.NuGetFeeds.Local.Command,
+                settings.NuGetFeeds.MyGet.Command,
+                "add", "remove", "disable", "enable", "create", "config", "default", "standard"
+            };
+
+            var builtinKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                settings.NuGetFeeds.NuGetOrg.Key,
+                settings.NuGetFeeds.Local.Key,
+                settings.NuGetFeeds.MyGet.Key
+            };
+
+            // Validate built-in feeds
+            if (string.IsNullOrWhiteSpace(settings.NuGetFeeds.NuGetOrg.Url))
+                issues.Add("Built-in NuGet.org feed has empty URL");
+            if (string.IsNullOrWhiteSpace(settings.NuGetFeeds.MyGet.Url))
+                issues.Add("Built-in MyGet feed has empty URL");
+
+            // Validate custom feeds
+            if (settings.NuGetFeeds.Custom != null && settings.NuGetFeeds.Custom.Count > 0)
+            {
+                var seenCommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var kv in settings.NuGetFeeds.Custom)
+                {
+                    var feed = kv.Value;
+                    var feedName = kv.Key;
+
+                    // Check for empty fields
+                    if (string.IsNullOrWhiteSpace(feed.Command))
+                        issues.Add($"Custom feed '{feedName}' has empty command");
+                    if (string.IsNullOrWhiteSpace(feed.Key))
+                        issues.Add($"Custom feed '{feedName}' has empty key");
+                    if (string.IsNullOrWhiteSpace(feed.Url))
+                        issues.Add($"Custom feed '{feedName}' has empty URL");
+
+                    // Check for collisions with built-ins
+                    if (!string.IsNullOrWhiteSpace(feed.Command) && builtinCommands.Contains(feed.Command))
+                        issues.Add($"Custom feed '{feedName}' command '{feed.Command}' conflicts with built-in/reserved command");
+                    if (!string.IsNullOrWhiteSpace(feed.Key) && builtinKeys.Contains(feed.Key))
+                        issues.Add($"Custom feed '{feedName}' key '{feed.Key}' conflicts with built-in key");
+
+                    // Check for duplicate commands/keys among custom feeds
+                    if (!string.IsNullOrWhiteSpace(feed.Command))
+                    {
+                        if (seenCommands.Contains(feed.Command))
+                            issues.Add($"Duplicate command '{feed.Command}' found in custom feeds");
+                        else
+                            seenCommands.Add(feed.Command);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(feed.Key))
+                    {
+                        if (seenKeys.Contains(feed.Key))
+                            issues.Add($"Duplicate key '{feed.Key}' found in custom feeds");
+                        else
+                            seenKeys.Add(feed.Key);
+                    }
+
+                    // Basic URL validation
+                    if (!string.IsNullOrWhiteSpace(feed.Url))
+                    {
+                        if (!Uri.TryCreate(feed.Url, UriKind.Absolute, out var uri))
+                            issues.Add($"Custom feed '{feedName}' has invalid URL: {feed.Url}");
+                        else if (uri.Scheme != "https" && uri.Scheme != "http" && uri.Scheme != "file")
+                            issues.Add($"Custom feed '{feedName}' URL has unsupported scheme: {uri.Scheme}");
+                    }
+                }
+            }
+
+            if (issues.Count == 0)
+            {
+                Console.WriteLine("✅ Configuration is valid! No issues found.");
+            }
+            else
+            {
+                Console.WriteLine($"❌ Found {issues.Count} issue(s):");
+                Console.WriteLine();
+                foreach (var issue in issues)
+                {
+                    Console.WriteLine($"  • {issue}");
+                }
+            }
+        });
+        configCommand.AddCommand(configValidate);
+
+        rootCommand.AddCommand(configCommand);
 
         // Remove command
         var removeCommand = new Command("remove", "Remove a key from existing NuGet.config");
@@ -202,10 +662,12 @@ class Program
 
     private static void ShowUsage()
     {
+        // Kept for reference; help is now shown by default with no args via System.CommandLine
         Console.WriteLine("Usage:");
-        Console.WriteLine($"  nugetc                    - Create standard config (default)");
-        Console.WriteLine($"  nugetc {_appSettings!.NuGetFeeds.Local.Command,-10} - Create config with local feed");
-        Console.WriteLine($"  nugetc {_appSettings!.NuGetFeeds.MyGet.Command,-10} - Create config with MyGet feed");
+    Console.WriteLine($"  nugetc add {_appSettings!.NuGetFeeds.NuGetOrg.Command,-10} - Add nuget.org feed / create standard config (alias: 'default')");
+    Console.WriteLine($"  nugetc create               - Create standard config (same as 'add default')");
+        Console.WriteLine($"  nugetc add {_appSettings!.NuGetFeeds.Local.Command,-10} - Add local feed (--path optional)");
+        Console.WriteLine($"  nugetc add {_appSettings!.NuGetFeeds.MyGet.Command,-10} - Add MyGet feed");
         Console.WriteLine();
         Console.WriteLine("Management Commands:");
         Console.WriteLine("  nugetc remove --key <key>  - Remove a key from existing config");
@@ -228,5 +690,37 @@ class Program
             .Build();
 
         _appSettings = configuration.Get<AppSettings>() ?? new AppSettings();
+    }
+
+    private static string GetAppSettingsPath()
+    {
+        return Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+    }
+
+    private static AppSettings LoadAppSettingsFromFile(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return new AppSettings();
+        }
+        var json = File.ReadAllText(path);
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            ReadCommentHandling = JsonCommentHandling.Skip,
+            AllowTrailingCommas = true
+        };
+        return JsonSerializer.Deserialize<AppSettings>(json, options) ?? new AppSettings();
+    }
+
+    private static void SaveAppSettingsToFile(string path, AppSettings settings)
+    {
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        var json = JsonSerializer.Serialize(settings, options);
+        File.WriteAllText(path, json);
     }
 }

@@ -28,7 +28,7 @@ This isn't just another boring configuration generator - this is a **game-change
 **Debugging Workflow:**
 
 ```bash
-nugetc myget                    # Add debug feed, myget is in the config, so we know the url
+nugetc add myget                # Add debug feed (preconfigured in appsettings.json)
 # ... do your debugging magic ...
 nugetc disable --key MyGet      # Temporarily disable
 # ... continue development ...
@@ -39,7 +39,7 @@ nugetc remove --key MyGet       # Clean up when done
 **Team Development:**
 
 ```bash
-nugetc local --path "D:\TeamFeed"  # Add team feed
+nugetc add local --path "D:\TeamFeed"  # Add team feed
 # ... collaborate with team ...
 nugetc remove --key Local          # Clean up
 ```
@@ -47,8 +47,8 @@ nugetc remove --key Local          # Clean up
 **Smart Duplicate Prevention:**
 
 ```bash
-nugetc myget    # First time: "NuGet.config with MyGet.org feed created successfully!"
-nugetc myget    # Second time: "NuGet.config already exists and contains the 'MyGet' key."
+nugetc add myget    # First time: "NuGet.config with MyGet.org feed created successfully!"
+nugetc add myget    # Second time: "NuGet.config already exists and contains the 'MyGet' key."
 ```
 
 ### 🎉 **What You Get**
@@ -80,17 +80,24 @@ dotnet tool install --global nugetc
 After installation, you can use the tool with the following commands:
 
 ```bash
-# Create a standard NuGet.config with only nuget.org feed (default)
-nugetc
+# Show help and available commands
+nugetc --help
 
-# Create or add to a NuGet.config with local feed (default path: C:\nuget) 
-nugetc local
+# Create or add a standard NuGet.config with only nuget.org feed
+nugetc add default    # primary name (alternate: 'standard')
+nugetc add standard   # alternate name
 
-# Create or add to, or modify a NuGet.config with local feed at custom path
-nugetc local --path "D:\MyNuGetFeed"
+# Alternatively, the top-level 'create' command does the same as 'add default'
+nugetc create
 
-# Create or add to a NuGet.config with MyGet.org feed
-nugetc myget
+# Create or add a NuGet.config with local feed (default path: C:\nuget)
+nugetc add local
+
+# Create or add a NuGet.config with local feed at custom path
+nugetc add local --path "D:\MyNuGetFeed"
+
+# Create or add a NuGet.config with MyGet.org feed
+nugetc add myget
 ```
 
 ### 🛠️ **Management Commands - The Game Changers!**
@@ -122,7 +129,7 @@ dotnet new nugetc --configType myget
 
 ## Configuration Types
 
-1. **Standard**: Creates a basic NuGet.config with only the official nuget.org feed. This is the default, so you rarely need to specify standard.
+1. **Standard (alias: default)**: Creates a basic NuGet.config with only the official nuget.org feed. Invoke with `nugetc add default` (or `nugetc add standard`).
 2. **Local**: Adds a local feed source (default: C:\nuget, customizable via --path parameter)
 3. **MyGet**: Adds MyGet.org feed source (NUnit feed)
 
@@ -137,19 +144,43 @@ dotnet new nugetc --configType myget
 
 You can add your own feeds, if three feeds are not enough for you.
 
-E.g. a github package feed:
+E.g. a GitHub Packages feed:
 
 ```bash
-nugetc add github --path "https://nuget.pkg.github.com/NAMESPACE/index.json"
+# Add a custom feed to appsettings.json (creates/updates the config)
+nugetc config add --name GitHub --command github --url "https://nuget.pkg.github.com/NAMESPACE/index.json"
+
+# Then use it to add the feed to NuGet.config (on next run)
+nugetc add github
 ```
 
-and then you can use the command
+You can remove it from the tool configuration later:
 
 ```bash
-nugetc github
+nugetc config remove --name GitHub
+# or
+nugetc config remove --command github
 ```
 
-and add that feed to your nuget.config files ! 
+Note: newly added commands appear on the next run because commands are generated from appsettings.json at startup.
+
+You can list and rename custom feeds:
+
+```bash
+# List all configured feeds (built-in and custom)
+nugetc config list
+
+# Show details of a specific feed in JSON format
+nugetc config show --name GitHub
+nugetc config show --command github
+
+# Validate configuration for collisions and invalid URLs
+nugetc config validate
+
+# Rename a custom feed's name and/or command
+nugetc config rename --name GitHub --new-name GitHubEnterprise
+nugetc config rename --command github --new-command ghe
+```
 
 ## Configuration
 
