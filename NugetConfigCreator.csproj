@@ -12,9 +12,14 @@
     <Authors>Terje Sandstrom</Authors>
     <Copyright>Copyright © 2025 Terje Sandstrom</Copyright>
     <Description>A .NET tool for creating NuGet.config files with different feed configurations</Description>
-    <!-- Ensure README and LICENSE are surfaced on NuGet.org -->
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageProjectUrl>https://github.com/HermitOS/nugetconfigcreator</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/HermitOS/nugetconfigcreator</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>nuget;config;tool;cli;dotnet-tool;nuget-config;configuration</PackageTags>
+    <PackageIcon>icon2-128x128.png</PackageIcon>
+ 
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,9 +33,9 @@
     <None Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <!-- Pack README and LICENSE into the NuGet package root -->
     <None Include="README.md" Pack="true" PackagePath="/" />
     <None Include="LICENSE" Pack="true" PackagePath="/" />
+    <None Include="icon2-128x128.png" Pack="true" PackagePath="/" />
   </ItemGroup>
 
 </Project>

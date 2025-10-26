@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 using NugetConfigCreator.Templates;
 using NugetConfigCreator.Configuration;
@@ -684,12 +685,93 @@ class Program
 
     private static void LoadConfiguration()
     {
+        // Before loading, check for a backup file and offer restore if structures match but content differs
+        var configPath = GetAppSettingsPath();
+        var backupPath = configPath + ".backup";
+
+        if (File.Exists(backupPath) && File.Exists(configPath))
+        {
+            if (TryLoadAppSettingsFromFile(configPath, out var current) && TryLoadAppSettingsFromFile(backupPath, out var backup))
+            {
+                if (!AreAppSettingsEquivalent(current, backup))
+                {
+                    Console.Write($"A backup configuration was found (appsettings.json.backup) that differs from the current configuration. Restore backup? (Y/N): ");
+                    var answer = Console.ReadLine();
+                    if (!string.IsNullOrWhiteSpace(answer) && (answer.StartsWith("Y", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        File.Copy(backupPath, configPath, overwrite: true);
+                        Console.WriteLine("Backup restored to appsettings.json.");
+                    }
+                }
+            }
+        }
+
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .Build();
 
         _appSettings = configuration.Get<AppSettings>() ?? new AppSettings();
+    }
+
+    private static bool TryLoadAppSettingsFromFile(string path, out AppSettings settings)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                settings = new AppSettings();
+                return false;
+            }
+            var json = File.ReadAllText(path);
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                ReadCommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            };
+            settings = JsonSerializer.Deserialize<AppSettings>(json, options) ?? new AppSettings();
+            return true;
+        }
+        catch
+        {
+            settings = new AppSettings();
+            return false;
+        }
+    }
+
+    private static bool AreAppSettingsEquivalent(AppSettings a, AppSettings b)
+    {
+        if (a == null || b == null) return false;
+        if (!FeedEquals(a.NuGetFeeds.NuGetOrg, b.NuGetFeeds.NuGetOrg)) return false;
+        if (!FeedEquals(a.NuGetFeeds.MyGet, b.NuGetFeeds.MyGet)) return false;
+        if (!LocalEquals(a.NuGetFeeds.Local, b.NuGetFeeds.Local)) return false;
+
+        var aCustom = a.NuGetFeeds.Custom ?? new Dictionary<string, NuGetFeedConfig>();
+        var bCustom = b.NuGetFeeds.Custom ?? new Dictionary<string, NuGetFeedConfig>();
+
+        if (aCustom.Count != bCustom.Count) return false;
+        foreach (var kv in aCustom)
+        {
+            if (!bCustom.TryGetValue(kv.Key, out var bf)) return false;
+            if (!FeedEquals(kv.Value, bf)) return false;
+        }
+        return true;
+    }
+
+    private static bool FeedEquals(NuGetFeedConfig x, NuGetFeedConfig y)
+    {
+        return string.Equals(x.Key, y.Key, StringComparison.Ordinal)
+            && string.Equals(x.Command, y.Command, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(x.Url, y.Url, StringComparison.Ordinal)
+            && string.Equals(x.ProtocolVersion ?? string.Empty, y.ProtocolVersion ?? string.Empty, StringComparison.Ordinal);
+    }
+
+    private static bool LocalEquals(LocalFeedConfig x, LocalFeedConfig y)
+    {
+        return string.Equals(x.Key, y.Key, StringComparison.Ordinal)
+            && string.Equals(x.Command, y.Command, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(x.DefaultPath, y.DefaultPath, StringComparison.Ordinal);
     }
 
     private static string GetAppSettingsPath()
@@ -721,6 +803,10 @@ class Program
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
         var json = JsonSerializer.Serialize(settings, options);
+        // Save primary file
         File.WriteAllText(path, json);
+        // Also save a backup alongside the primary file
+        var backupPath = path + ".backup";
+        File.WriteAllText(backupPath, json);
     }
 }
