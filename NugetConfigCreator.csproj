@@ -8,7 +8,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>nugetc</ToolCommandName>
     <PackageId>nugetc</PackageId>
-    <Version>0.1.2</Version>
+    <Version>0.1.4</Version>
     <Authors>Terje Sandstrom</Authors>
     <Copyright>Copyright © 2025 Terje Sandstrom</Copyright>
     <Description>A .NET tool for creating NuGet.config files with different feed configurations</Description>
@@ -19,6 +19,9 @@
     <RepositoryType>git</RepositoryType>
     <PackageTags>nuget;config;tool;cli;dotnet-tool;nuget-config;configuration</PackageTags>
     <PackageIcon>icon2-128x128.png</PackageIcon>
+  <!-- Ensure version output shows plain SemVer without plus metadata -->
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
  
   </PropertyGroup>
 

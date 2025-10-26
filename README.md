@@ -15,7 +15,6 @@ This isn't just another boring configuration generator - this is a **game-change
 ⚡ **Lightning Fast** - No more waiting around for complex setup processes!  
 🛠️ **Developer-Friendly** - Clean, intuitive commands that just make sense!  
 🔄 **Hot Reload** - Change your configuration and see results instantly!  
-📦 **Multiple Formats** - Works as both a .NET tool AND a dotnet new template!  
 🎯 **Smart Defaults** - Comes with sensible configurations out of the box!  
 🚀 **Extensible** - Add company feeds, dev environments, staging servers - the sky's the limit!  
 🧠 **Smart Config Management** - Detects existing configs and prevents duplicates!  
@@ -75,13 +74,14 @@ dotnet tool install --global nugetc
 
 ## Usage
 
-### As a .NET Tool
-
 After installation, you can use the tool with the following commands:
 
 ```bash
 # Show help and available commands
 nugetc --help
+
+# View the README in your browser
+nugetc readme
 
 # Create or add a standard NuGet.config with only nuget.org feed
 nugetc add default    # primary name (alternate: 'standard')
@@ -117,20 +117,6 @@ nugetc disable default
 nugetc enable local
 nugetc enable myget
 nugetc enable default
-```
-
-### As a dotnet new template
-
-You can also use this as a `dotnet new` template:
-
-```bash
-# Install the template
-dotnet new --install .
-
-# Create NuGet.config files
-dotnet new nugetc --configType standard
-dotnet new nugetc --configType local --localPath "D:\MyNuGetFeed"
-dotnet new nugetc --configType myget
 ```
 
 ## Configuration Types
