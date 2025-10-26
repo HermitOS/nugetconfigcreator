@@ -36,24 +36,18 @@ jobs:
         if (-not $ver) { throw "Version property not found in $env:PROJECT" }
         "version=$ver" >> $env:GITHUB_OUTPUT
         Write-Host "Resolved version: $ver"
-
-    - name: Rename run to include version
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const version = '${{ steps.get_version.outputs.version }}';
-          await github.rest.actions.updateWorkflowRun({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            run_id: context.runId,
-            name: `Publish nugetc v${version}`
-          });
     
-    - name: Pack
+    - name: Pack v${{ steps.get_version.outputs.version }}
       run: dotnet pack $PROJECT --configuration Release --no-build --output ./artifacts
 
-    - name: Push to NuGet.org
+    - name: Push to NuGet.org v${{ steps.get_version.outputs.version }}
       run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+    - name: Upload package artifact v${{ steps.get_version.outputs.version }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: nugetc-v${{ steps.get_version.outputs.version }}
+        path: ./artifacts/*.nupkg
 
     - name: Summary
       shell: pwsh

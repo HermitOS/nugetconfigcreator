@@ -20,7 +20,6 @@ This isn't just another boring configuration generator - this is a **game-change
 🧠 **Smart Config Management** - Detects existing configs and prevents duplicates!  
 🎭 **Enable/Disable Magic** - Temporarily disable feeds with XML commenting!  
 🗑️ **Easy Cleanup** - Remove keys when you're done debugging!  
-💡 **No More Overwrites** - Preserves your existing configurations perfectly!  
 
 ### 🚀 **Real-World Usage Scenarios**
 
@@ -60,7 +59,7 @@ When you run this tool, you'll get a **beautifully formatted, production-ready N
 - ✅ **Clean XML structure** that follows Microsoft's best practices
 - ✅ **Proper configuration** that works with all NuGet clients
 - ✅ **No more typos** or missing attributes in your config files!
-- ✅ **Smart duplicate detection** - never accidentally overwrite existing configs!
+- ✅ **Smart overwrites** - You can update the paths of existing feeds!
 - ✅ **Temporary disabling** - comment out feeds after debugging, then re-enable for debugging!
 - ✅ **Easy cleanup** - remove keys when you're done with them!
 
@@ -96,6 +95,11 @@ nugetc add local
 # Create or add a NuGet.config with local feed at custom path
 nugetc add local --path "D:\MyNuGetFeed"
 
+# Note on --path and updates (local feed)
+# - If NuGet.config already contains the 'local' feed, running with --path updates the existing path.
+# - Running without --path preserves the current path (no change).
+# - To start fresh, remove then add: `nugetc remove local` → `nugetc add local --path "D:\NewPath"`
+
 # Create or add a NuGet.config with MyGet.org feed
 nugetc add myget
 ```
@@ -117,6 +121,9 @@ nugetc disable default
 nugetc enable local
 nugetc enable myget
 nugetc enable default
+
+# Validate configuration (check for collisions and invalid URLs)
+nugetc config validate
 ```
 
 ## Configuration Types
@@ -130,7 +137,6 @@ nugetc enable default
 - **First Run**: Creates a new NuGet.config with the specified feed
 - **Subsequent Runs**: Adds the feed to existing config (if not already present)
 - **Duplicate Detection**: Informs you if the key already exists
-- **No Overwrites**: Always preserves your existing configuration
 
 ## Add more Custom feeds
 
