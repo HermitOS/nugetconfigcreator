@@ -191,11 +191,11 @@ class Program
 
         // 'config' command group for managing appsettings.json custom feeds
         var configCommand = new Command("config", "Manage tool configuration (appsettings.json)");
-        var configAdd = new Command("add", "Add or update a custom feed in appsettings.json");
-        var nameOpt = new Option<string>("--name", description: "Feed name (e.g., GitHub) - also used as command (lowercase)") { IsRequired = true };
+    var configAdd = new Command("add", "Add or update a custom feed in appsettings.json");
+    var nameArg = new Argument<string>("name", description: "Feed name (e.g., GitHub) - also used as command (lowercase)");
         var urlOpt = new Option<string>("--url", description: "Feed URL (e.g., https://nuget.pkg.github.com/ORG/index.json)") { IsRequired = true };
         var protoOpt = new Option<string?>("--protocol-version", () => null, description: "Optional protocol version (e.g., 3)");
-        configAdd.AddOption(nameOpt);
+    configAdd.AddArgument(nameArg);
         configAdd.AddOption(urlOpt);
         configAdd.AddOption(protoOpt);
         configAdd.SetHandler((string name, string url, string? protocol) =>
@@ -230,11 +230,11 @@ class Program
             };
             SaveAppSettingsToFile(path, settings);
             Console.WriteLine($"Added/updated custom feed '{name}' with command '{command}'. Restart the tool to use 'nugetc add {command}'.");
-        }, nameOpt, urlOpt, protoOpt);
+    }, nameArg, urlOpt, protoOpt);
 
-        var configRemove = new Command("remove", "Remove a custom feed from appsettings.json");
-        var removeNameOpt = new Option<string>("--name", description: "Feed name to remove") { IsRequired = true };
-        configRemove.AddOption(removeNameOpt);
+    var configRemove = new Command("remove", "Remove a custom feed from appsettings.json");
+    var removeNameArg = new Argument<string>("name", description: "Feed name to remove");
+    configRemove.AddArgument(removeNameArg);
         configRemove.SetHandler((string name) =>
         {
             var path = GetAppSettingsPath();
@@ -254,7 +254,7 @@ class Program
             settings.NuGetFeeds.Custom.Remove(name);
             SaveAppSettingsToFile(path, settings);
             Console.WriteLine($"Removed custom feed '{name}'. Restart the tool for changes to take effect.");
-        }, removeNameOpt);
+    }, removeNameArg);
 
         configCommand.AddCommand(configAdd);
         configCommand.AddCommand(configRemove);
