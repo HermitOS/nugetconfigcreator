@@ -140,7 +140,7 @@ E.g. a GitHub Packages feed:
 
 ```bash
 # Add a custom feed to appsettings.json (name is used as command in lowercase)
-nugetc config add --name GitHub --url "https://nuget.pkg.github.com/NAMESPACE/index.json"
+nugetc config add GitHub --url "https://nuget.pkg.github.com/NAMESPACE/index.json"
 
 # Then use it to add the feed to NuGet.config (restart the tool first)
 nugetc add github
@@ -149,7 +149,7 @@ nugetc add github
 You can remove it from the tool configuration later:
 
 ```bash
-nugetc config remove --name GitHub
+nugetc config remove GitHub
 ```
 
 Note: newly added commands appear on the next run because commands are generated from appsettings.json at startup.
@@ -161,15 +161,15 @@ You can list and rename custom feeds:
 nugetc config list
 
 # Show details of a specific feed in JSON format
-nugetc config show --name GitHub
-nugetc config show --name local
-nugetc config show --name default
+nugetc config show GitHub
+nugetc config show local
+nugetc config show default
 
 # Validate configuration for collisions and invalid URLs
 nugetc config validate
 
 # Rename a custom feed
-nugetc config rename --name GitHub --new-name GitHubEnterprise
+nugetc config rename GitHub GitHubEnterprise
 ```
 
 ## Configuration

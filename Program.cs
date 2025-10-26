@@ -290,10 +290,10 @@ class Program
 
         // Rename custom feed
         var configRename = new Command("rename", "Rename a custom feed");
-        var renameOldNameOpt = new Option<string>("--name", description: "Existing feed name") { IsRequired = true };
-        var renameNewNameOpt = new Option<string>("--new-name", description: "New feed name") { IsRequired = true };
-        configRename.AddOption(renameOldNameOpt);
-        configRename.AddOption(renameNewNameOpt);
+        var renameOldNameArg = new Argument<string>("current-name", description: "Existing feed name");
+        var renameNewNameArg = new Argument<string>("new-name", description: "New feed name");
+        configRename.AddArgument(renameOldNameArg);
+        configRename.AddArgument(renameNewNameArg);
         configRename.SetHandler((string oldName, string newName) =>
         {
             var path = GetAppSettingsPath();
@@ -339,14 +339,14 @@ class Program
 
             SaveAppSettingsToFile(path, settings);
             Console.WriteLine($"Renamed custom feed from '{oldName}' to '{newName}' (command: '{newCommand}'). Restart the tool for changes to take effect.");
-        }, renameOldNameOpt, renameNewNameOpt);
+        }, renameOldNameArg, renameNewNameArg);
 
         configCommand.AddCommand(configRename);
 
         // Show details of a single feed
-        var configShow = new Command("show", "Show details of a specific feed in JSON format");
-        var showNameOpt = new Option<string>("--name", description: "Feed name to show") { IsRequired = true };
-        configShow.AddOption(showNameOpt);
+    var configShow = new Command("show", "Show details of a specific feed in JSON format");
+    var showNameArg = new Argument<string>("name", description: "Feed name to show");
+    configShow.AddArgument(showNameArg);
         configShow.SetHandler((string name) =>
         {
             var path = GetAppSettingsPath();
@@ -389,7 +389,7 @@ class Program
 
             Console.WriteLine($"Feed: {feedToShow.Key} ({feedType})");
             Console.WriteLine(JsonSerializer.Serialize(feedToShow, new JsonSerializerOptions { WriteIndented = true }));
-        }, showNameOpt);
+    }, showNameArg);
         configCommand.AddCommand(configShow);
 
         // Validate configuration for collisions and issues
