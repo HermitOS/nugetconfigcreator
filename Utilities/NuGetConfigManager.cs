@@ -35,7 +35,7 @@ public class NuGetConfigManager
         if (_document == null) return false;
         
         return _document.Descendants("add")
-            .Any(add => add.Attribute("key")?.Value == key);
+            .Any(add => string.Equals(add.Attribute("key")?.Value, key, StringComparison.OrdinalIgnoreCase));
     }
 
     public void AddOrUpdateKey(string key, string value, string? protocolVersion = null)
@@ -48,17 +48,17 @@ public class NuGetConfigManager
         var packageSources = _document!.Root?.Element("packageSources");
         if (packageSources == null) return;
 
-        // Remove existing key if it exists
+        // Remove existing key if it exists (case-insensitive)
         var existingAdd = packageSources.Elements("add")
-            .FirstOrDefault(add => add.Attribute("key")?.Value == key);
+            .FirstOrDefault(add => string.Equals(add.Attribute("key")?.Value, key, StringComparison.OrdinalIgnoreCase));
         
         if (existingAdd != null)
         {
             existingAdd.Remove();
         }
 
-        // Add new key
-        var newAdd = new XElement("add", new XAttribute("key", key), new XAttribute("value", value));
+        // Add new key (convert to lowercase)
+        var newAdd = new XElement("add", new XAttribute("key", key.ToLowerInvariant()), new XAttribute("value", value));
         if (!string.IsNullOrEmpty(protocolVersion))
         {
             newAdd.Add(new XAttribute("protocolVersion", protocolVersion));
@@ -75,7 +75,7 @@ public class NuGetConfigManager
         if (packageSources == null) return;
 
         var existingAdd = packageSources.Elements("add")
-            .FirstOrDefault(add => add.Attribute("key")?.Value == key);
+            .FirstOrDefault(add => string.Equals(add.Attribute("key")?.Value, key, StringComparison.OrdinalIgnoreCase));
         
         if (existingAdd != null)
         {
@@ -91,7 +91,7 @@ public class NuGetConfigManager
         if (packageSources == null) return;
 
         var existingAdd = packageSources.Elements("add")
-            .FirstOrDefault(add => add.Attribute("key")?.Value == key);
+            .FirstOrDefault(add => string.Equals(add.Attribute("key")?.Value, key, StringComparison.OrdinalIgnoreCase));
         
         if (existingAdd != null)
         {
@@ -125,7 +125,7 @@ public class NuGetConfigManager
             {
                 var commentDoc = XDocument.Parse(comment.Value);
                 var addElement = commentDoc.Root;
-                if (addElement?.Attribute("key")?.Value == key)
+                if (addElement != null && string.Equals(addElement.Attribute("key")?.Value, key, StringComparison.OrdinalIgnoreCase))
                 {
                     // Replace comment with actual element
                     comment.ReplaceWith(addElement);

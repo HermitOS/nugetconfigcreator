@@ -30,10 +30,10 @@ This isn't just another boring configuration generator - this is a **game-change
 ```bash
 nugetc add myget                # Add debug feed (preconfigured in appsettings.json)
 # ... do your debugging magic ...
-nugetc disable --key MyGet      # Temporarily disable
+nugetc disable myget            # Temporarily disable
 # ... continue development ...
-nugetc enable --key MyGet       # Re-enable when needed
-nugetc remove --key MyGet       # Clean up when done
+nugetc enable myget             # Re-enable when needed
+nugetc remove myget             # Clean up when done
 ```
 
 **Team Development:**
@@ -41,14 +41,14 @@ nugetc remove --key MyGet       # Clean up when done
 ```bash
 nugetc add local --path "D:\TeamFeed"  # Add team feed
 # ... collaborate with team ...
-nugetc remove --key Local          # Clean up
+nugetc remove local                    # Clean up
 ```
 
 **Smart Duplicate Prevention:**
 
 ```bash
 nugetc add myget    # First time: "NuGet.config with MyGet.org feed created successfully!"
-nugetc add myget    # Second time: "NuGet.config already exists and contains the 'MyGet' key."
+nugetc add myget    # Second time: "NuGet.config already exists and contains the 'myget' key."
 ```
 
 ### 🎉 **What You Get**
@@ -103,14 +103,20 @@ nugetc add myget
 ### 🛠️ **Management Commands - The Game Changers!**
 
 ```bash
-# Remove a key from existing NuGet.config
-nugetc remove --key MyGet
+# Remove a feed from existing NuGet.config
+nugetc remove local    # Remove local feed
+nugetc remove myget    # Remove MyGet feed
+nugetc remove default  # Remove nuget.org feed
 
-# Temporarily disable a key (comments it out)
-nugetc disable --key MyGet
+# Temporarily disable a feed (comments it out)
+nugetc disable local
+nugetc disable myget
+nugetc disable default
 
-# Re-enable a disabled key (uncomments it)
-nugetc enable --key MyGet
+# Re-enable a disabled feed (uncomments it)
+nugetc enable local
+nugetc enable myget
+nugetc enable default
 ```
 
 ### As a dotnet new template
@@ -147,10 +153,10 @@ You can add your own feeds, if three feeds are not enough for you.
 E.g. a GitHub Packages feed:
 
 ```bash
-# Add a custom feed to appsettings.json (creates/updates the config)
-nugetc config add --name GitHub --command github --url "https://nuget.pkg.github.com/NAMESPACE/index.json"
+# Add a custom feed to appsettings.json (name is used as command in lowercase)
+nugetc config add --name GitHub --url "https://nuget.pkg.github.com/NAMESPACE/index.json"
 
-# Then use it to add the feed to NuGet.config (on next run)
+# Then use it to add the feed to NuGet.config (restart the tool first)
 nugetc add github
 ```
 
@@ -158,8 +164,6 @@ You can remove it from the tool configuration later:
 
 ```bash
 nugetc config remove --name GitHub
-# or
-nugetc config remove --command github
 ```
 
 Note: newly added commands appear on the next run because commands are generated from appsettings.json at startup.
@@ -172,14 +176,14 @@ nugetc config list
 
 # Show details of a specific feed in JSON format
 nugetc config show --name GitHub
-nugetc config show --command github
+nugetc config show --name local
+nugetc config show --name default
 
 # Validate configuration for collisions and invalid URLs
 nugetc config validate
 
-# Rename a custom feed's name and/or command
+# Rename a custom feed
 nugetc config rename --name GitHub --new-name GitHubEnterprise
-nugetc config rename --command github --new-command ghe
 ```
 
 ## Configuration

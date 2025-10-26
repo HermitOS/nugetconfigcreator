@@ -192,19 +192,20 @@ class Program
         // 'config' command group for managing appsettings.json custom feeds
         var configCommand = new Command("config", "Manage tool configuration (appsettings.json)");
         var configAdd = new Command("add", "Add or update a custom feed in appsettings.json");
-        var nameOpt = new Option<string>("--name", description: "Logical feed name (e.g., GitHub)") { IsRequired = true };
-        var cmdOpt = new Option<string>("--command", description: "CLI command to add this feed (e.g., github)") { IsRequired = true };
+        var nameOpt = new Option<string>("--name", description: "Feed name (e.g., GitHub) - also used as command (lowercase)") { IsRequired = true };
         var urlOpt = new Option<string>("--url", description: "Feed URL (e.g., https://nuget.pkg.github.com/ORG/index.json)") { IsRequired = true };
         var protoOpt = new Option<string?>("--protocol-version", () => null, description: "Optional protocol version (e.g., 3)");
         configAdd.AddOption(nameOpt);
-        configAdd.AddOption(cmdOpt);
         configAdd.AddOption(urlOpt);
         configAdd.AddOption(protoOpt);
-        configAdd.SetHandler((string name, string command, string url, string? protocol) =>
+        configAdd.SetHandler((string name, string url, string? protocol) =>
         {
             var path = GetAppSettingsPath();
             var settings = LoadAppSettingsFromFile(path);
             settings.NuGetFeeds.Custom ??= new();
+
+            // Command is derived from name (lowercase)
+            var command = name.ToLowerInvariant();
 
             // Prevent collisions with built-in commands
             var builtins = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -216,27 +217,25 @@ class Program
             };
             if (builtins.Contains(command))
             {
-                Console.WriteLine($"Command '{command}' conflicts with a built-in command. Choose another.");
+                Console.WriteLine($"Name '{name}' conflicts with a built-in command. Choose another.");
                 return;
             }
 
             settings.NuGetFeeds.Custom[name] = new NuGetFeedConfig
             {
-                Key = name,
+                Key = name.ToLowerInvariant(),
                 Command = command,
                 Url = url,
                 ProtocolVersion = protocol
             };
             SaveAppSettingsToFile(path, settings);
             Console.WriteLine($"Added/updated custom feed '{name}' with command '{command}'. Restart the tool to use 'nugetc add {command}'.");
-        }, nameOpt, cmdOpt, urlOpt, protoOpt);
+        }, nameOpt, urlOpt, protoOpt);
 
         var configRemove = new Command("remove", "Remove a custom feed from appsettings.json");
-        var nameOrCmdOpt = new Option<string>("--name", description: "Logical feed name to remove (or use --command)");
-        var byCmdOpt = new Option<string>("--command", description: "Command name to remove (or use --name)");
-        configRemove.AddOption(nameOrCmdOpt);
-        configRemove.AddOption(byCmdOpt);
-        configRemove.SetHandler((string name, string command) =>
+        var removeNameOpt = new Option<string>("--name", description: "Feed name to remove") { IsRequired = true };
+        configRemove.AddOption(removeNameOpt);
+        configRemove.SetHandler((string name) =>
         {
             var path = GetAppSettingsPath();
             var settings = LoadAppSettingsFromFile(path);
@@ -246,30 +245,16 @@ class Program
                 return;
             }
 
-            string? toRemoveKey = null;
-            if (!string.IsNullOrWhiteSpace(name) && settings.NuGetFeeds.Custom.ContainsKey(name))
+            if (!settings.NuGetFeeds.Custom.ContainsKey(name))
             {
-                toRemoveKey = name;
-            }
-            else if (!string.IsNullOrWhiteSpace(command))
-            {
-                var match = settings.NuGetFeeds.Custom.FirstOrDefault(kv => string.Equals(kv.Value.Command, command, StringComparison.OrdinalIgnoreCase));
-                if (!string.IsNullOrEmpty(match.Key))
-                {
-                    toRemoveKey = match.Key;
-                }
-            }
-
-            if (toRemoveKey == null)
-            {
-                Console.WriteLine("Custom feed not found. Specify --name or --command matching a custom entry.");
+                Console.WriteLine($"Custom feed '{name}' not found.");
                 return;
             }
 
-            settings.NuGetFeeds.Custom.Remove(toRemoveKey);
+            settings.NuGetFeeds.Custom.Remove(name);
             SaveAppSettingsToFile(path, settings);
-            Console.WriteLine($"Removed custom feed '{toRemoveKey}'. Restart the tool for changes to take effect.");
-        }, nameOrCmdOpt, byCmdOpt);
+            Console.WriteLine($"Removed custom feed '{name}'. Restart the tool for changes to take effect.");
+        }, removeNameOpt);
 
         configCommand.AddCommand(configAdd);
         configCommand.AddCommand(configRemove);
@@ -303,29 +288,14 @@ class Program
         });
         configCommand.AddCommand(configList);
 
-        // Rename custom feed (name and/or command)
-        var configRename = new Command("rename", "Rename a custom feed's name and/or command");
-        var selNameOpt = new Option<string>("--name", description: "Existing logical feed name to update");
-        var selCommandOpt = new Option<string>("--command", description: "Existing command to update");
-        var newNameOpt = new Option<string>("--new-name", description: "New logical feed name (updates Key and dictionary key)");
-        var newCommandOpt = new Option<string>("--new-command", description: "New CLI command name");
-        configRename.AddOption(selNameOpt);
-        configRename.AddOption(selCommandOpt);
-        configRename.AddOption(newNameOpt);
-        configRename.AddOption(newCommandOpt);
-        configRename.SetHandler((string selName, string selCommand, string newName, string newCommand) =>
+        // Rename custom feed
+        var configRename = new Command("rename", "Rename a custom feed");
+        var renameOldNameOpt = new Option<string>("--name", description: "Existing feed name") { IsRequired = true };
+        var renameNewNameOpt = new Option<string>("--new-name", description: "New feed name") { IsRequired = true };
+        configRename.AddOption(renameOldNameOpt);
+        configRename.AddOption(renameNewNameOpt);
+        configRename.SetHandler((string oldName, string newName) =>
         {
-            if (string.IsNullOrWhiteSpace(selName) && string.IsNullOrWhiteSpace(selCommand))
-            {
-                Console.WriteLine("Specify either --name or --command to select the custom feed to rename.");
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(newName) && string.IsNullOrWhiteSpace(newCommand))
-            {
-                Console.WriteLine("Specify at least one of --new-name or --new-command.");
-                return;
-            }
-
             var path = GetAppSettingsPath();
             var settings = LoadAppSettingsFromFile(path);
             if (settings.NuGetFeeds.Custom == null || settings.NuGetFeeds.Custom.Count == 0)
@@ -334,25 +304,13 @@ class Program
                 return;
             }
 
-            string? key = null;
-            if (!string.IsNullOrWhiteSpace(selName) && settings.NuGetFeeds.Custom.ContainsKey(selName))
+            if (!settings.NuGetFeeds.Custom.ContainsKey(oldName))
             {
-                key = selName;
-            }
-            else if (!string.IsNullOrWhiteSpace(selCommand))
-            {
-                var match = settings.NuGetFeeds.Custom.FirstOrDefault(kv => string.Equals(kv.Value.Command, selCommand, StringComparison.OrdinalIgnoreCase));
-                if (!string.IsNullOrEmpty(match.Key)) key = match.Key;
-            }
-
-            if (key == null)
-            {
-                Console.WriteLine("Custom feed not found for the given selector.");
+                Console.WriteLine($"Custom feed '{oldName}' not found.");
                 return;
             }
 
-            var feed = settings.NuGetFeeds.Custom[key];
-
+            var newCommand = newName.ToLowerInvariant();
             var builtinCommands = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 settings.NuGetFeeds.NuGetOrg.Command,
@@ -361,53 +319,35 @@ class Program
                 "add", "remove", "disable", "enable", "create", "config", "default", "standard"
             };
 
-            if (!string.IsNullOrWhiteSpace(newCommand))
+            if (builtinCommands.Contains(newCommand))
             {
-                if (builtinCommands.Contains(newCommand) || settings.NuGetFeeds.Custom.Values.Any(v => string.Equals(v.Command, newCommand, StringComparison.OrdinalIgnoreCase)))
-                {
-                    Console.WriteLine($"Cannot rename: command '{newCommand}' is reserved or already in use.");
-                    return;
-                }
+                Console.WriteLine($"Cannot rename: name '{newName}' conflicts with a built-in command.");
+                return;
             }
 
-            if (!string.IsNullOrWhiteSpace(newName))
+            if (settings.NuGetFeeds.Custom.ContainsKey(newName))
             {
-                var builtinKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    settings.NuGetFeeds.NuGetOrg.Key,
-                    settings.NuGetFeeds.Local.Key,
-                    settings.NuGetFeeds.MyGet.Key
-                };
-                if (builtinKeys.Contains(newName) || settings.NuGetFeeds.Custom.ContainsKey(newName))
-                {
-                    Console.WriteLine($"Cannot rename: name '{newName}' already exists.");
-                    return;
-                }
-
-                settings.NuGetFeeds.Custom.Remove(key);
-                feed.Key = newName;
-                settings.NuGetFeeds.Custom[newName] = feed;
-                key = newName;
+                Console.WriteLine($"Cannot rename: name '{newName}' already exists.");
+                return;
             }
 
-            if (!string.IsNullOrWhiteSpace(newCommand))
-            {
-                feed.Command = newCommand;
-            }
+            var feed = settings.NuGetFeeds.Custom[oldName];
+            settings.NuGetFeeds.Custom.Remove(oldName);
+            feed.Key = newCommand;
+            feed.Command = newCommand;
+            settings.NuGetFeeds.Custom[newName] = feed;
 
             SaveAppSettingsToFile(path, settings);
-            Console.WriteLine("Custom feed updated. Restart the tool for command changes to take effect.");
-        }, selNameOpt, selCommandOpt, newNameOpt, newCommandOpt);
+            Console.WriteLine($"Renamed custom feed from '{oldName}' to '{newName}' (command: '{newCommand}'). Restart the tool for changes to take effect.");
+        }, renameOldNameOpt, renameNewNameOpt);
 
         configCommand.AddCommand(configRename);
 
         // Show details of a single feed
         var configShow = new Command("show", "Show details of a specific feed in JSON format");
-        var showNameOpt = new Option<string>("--name", description: "Logical feed name to show (or use --command)");
-        var showCmdOpt = new Option<string>("--command", description: "Command name to show (or use --name)");
+        var showNameOpt = new Option<string>("--name", description: "Feed name to show") { IsRequired = true };
         configShow.AddOption(showNameOpt);
-        configShow.AddOption(showCmdOpt);
-        configShow.SetHandler((string name, string command) =>
+        configShow.SetHandler((string name) =>
         {
             var path = GetAppSettingsPath();
             var settings = LoadAppSettingsFromFile(path);
@@ -415,68 +355,41 @@ class Program
             NuGetFeedConfig? feedToShow = null;
             string feedType = "";
 
-            if (!string.IsNullOrWhiteSpace(name))
+            if (string.Equals(name, settings.NuGetFeeds.NuGetOrg.Key, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, settings.NuGetFeeds.NuGetOrg.Command, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "default", StringComparison.OrdinalIgnoreCase))
             {
-                if (string.Equals(name, settings.NuGetFeeds.NuGetOrg.Key, StringComparison.OrdinalIgnoreCase))
-                {
-                    feedToShow = settings.NuGetFeeds.NuGetOrg;
-                    feedType = "Built-in (NuGet.org)";
-                }
-                else if (string.Equals(name, settings.NuGetFeeds.MyGet.Key, StringComparison.OrdinalIgnoreCase))
-                {
-                    feedToShow = settings.NuGetFeeds.MyGet;
-                    feedType = "Built-in (MyGet)";
-                }
-                else if (string.Equals(name, settings.NuGetFeeds.Local.Key, StringComparison.OrdinalIgnoreCase))
-                {
-                    Console.WriteLine($"Feed: {settings.NuGetFeeds.Local.Key} (Built-in - Local)");
-                    Console.WriteLine(JsonSerializer.Serialize(settings.NuGetFeeds.Local, new JsonSerializerOptions { WriteIndented = true }));
-                    return;
-                }
-                else if (settings.NuGetFeeds.Custom?.ContainsKey(name) == true)
-                {
-                    feedToShow = settings.NuGetFeeds.Custom[name];
-                    feedType = "Custom";
-                }
+                feedToShow = settings.NuGetFeeds.NuGetOrg;
+                feedType = "Built-in (NuGet.org)";
             }
-            else if (!string.IsNullOrWhiteSpace(command))
+            else if (string.Equals(name, settings.NuGetFeeds.MyGet.Key, StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(name, settings.NuGetFeeds.MyGet.Command, StringComparison.OrdinalIgnoreCase))
             {
-                if (string.Equals(command, settings.NuGetFeeds.NuGetOrg.Command, StringComparison.OrdinalIgnoreCase))
-                {
-                    feedToShow = settings.NuGetFeeds.NuGetOrg;
-                    feedType = "Built-in (NuGet.org)";
-                }
-                else if (string.Equals(command, settings.NuGetFeeds.MyGet.Command, StringComparison.OrdinalIgnoreCase))
-                {
-                    feedToShow = settings.NuGetFeeds.MyGet;
-                    feedType = "Built-in (MyGet)";
-                }
-                else if (string.Equals(command, settings.NuGetFeeds.Local.Command, StringComparison.OrdinalIgnoreCase))
-                {
-                    Console.WriteLine($"Feed: {settings.NuGetFeeds.Local.Key} (Built-in - Local)");
-                    Console.WriteLine(JsonSerializer.Serialize(settings.NuGetFeeds.Local, new JsonSerializerOptions { WriteIndented = true }));
-                    return;
-                }
-                else if (settings.NuGetFeeds.Custom != null)
-                {
-                    var match = settings.NuGetFeeds.Custom.FirstOrDefault(kv => string.Equals(kv.Value.Command, command, StringComparison.OrdinalIgnoreCase));
-                    if (!string.IsNullOrEmpty(match.Key))
-                    {
-                        feedToShow = match.Value;
-                        feedType = "Custom";
-                    }
-                }
+                feedToShow = settings.NuGetFeeds.MyGet;
+                feedType = "Built-in (MyGet)";
+            }
+            else if (string.Equals(name, settings.NuGetFeeds.Local.Key, StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(name, settings.NuGetFeeds.Local.Command, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"Feed: {settings.NuGetFeeds.Local.Key} (Built-in - Local)");
+                Console.WriteLine(JsonSerializer.Serialize(settings.NuGetFeeds.Local, new JsonSerializerOptions { WriteIndented = true }));
+                return;
+            }
+            else if (settings.NuGetFeeds.Custom?.ContainsKey(name) == true)
+            {
+                feedToShow = settings.NuGetFeeds.Custom[name];
+                feedType = "Custom";
             }
 
             if (feedToShow == null)
             {
-                Console.WriteLine("Feed not found. Specify --name or --command matching an existing feed.");
+                Console.WriteLine($"Feed '{name}' not found.");
                 return;
             }
 
             Console.WriteLine($"Feed: {feedToShow.Key} ({feedType})");
             Console.WriteLine(JsonSerializer.Serialize(feedToShow, new JsonSerializerOptions { WriteIndented = true }));
-        }, showNameOpt, showCmdOpt);
+        }, showNameOpt);
         configCommand.AddCommand(configShow);
 
         // Validate configuration for collisions and issues
@@ -582,14 +495,13 @@ class Program
 
         rootCommand.AddCommand(configCommand);
 
-        // Remove command
-        var removeCommand = new Command("remove", "Remove a key from existing NuGet.config");
-        var removeKeyOption = new Option<string>(
-            name: "--key",
-            description: "The key to remove from NuGet.config"
-        );
-        removeCommand.AddOption(removeKeyOption);
-        removeCommand.SetHandler((string key) =>
+        // Remove command (subcommands like 'add')
+        var removeCommand = new Command("remove", "Remove a feed from existing NuGet.config");
+
+        // remove standard/default
+        var removeStandard = new Command(_appSettings!.NuGetFeeds.NuGetOrg.Command, "Remove nuget.org feed");
+        removeStandard.AddAlias("default");
+        removeStandard.SetHandler(() =>
         {
             var manager = new NuGetConfigManager();
             if (!manager.ConfigExists)
@@ -597,27 +509,98 @@ class Program
                 Console.WriteLine("No NuGet.config file found.");
                 return;
             }
-
-            if (!manager.KeyExists(key))
+            if (!manager.KeyExists(_appSettings!.NuGetFeeds.NuGetOrg.Key))
             {
-                Console.WriteLine($"Key '{key}' not found in NuGet.config.");
+                Console.WriteLine($"Key '{_appSettings!.NuGetFeeds.NuGetOrg.Key}' not found in NuGet.config.");
                 return;
             }
-
-            manager.RemoveKey(key);
+            manager.RemoveKey(_appSettings!.NuGetFeeds.NuGetOrg.Key);
             manager.SaveConfig();
-            Console.WriteLine($"Removed key '{key}' from NuGet.config successfully!");
-        }, removeKeyOption);
+            Console.WriteLine($"Removed key '{_appSettings!.NuGetFeeds.NuGetOrg.Key}' from NuGet.config successfully!");
+        });
+        removeCommand.AddCommand(removeStandard);
+
+        // remove local
+        var removeLocal = new Command(_appSettings!.NuGetFeeds.Local.Command, "Remove local feed");
+        removeLocal.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(_appSettings!.NuGetFeeds.Local.Key))
+            {
+                Console.WriteLine($"Key '{_appSettings!.NuGetFeeds.Local.Key}' not found in NuGet.config.");
+                return;
+            }
+            manager.RemoveKey(_appSettings!.NuGetFeeds.Local.Key);
+            manager.SaveConfig();
+            Console.WriteLine($"Removed key '{_appSettings!.NuGetFeeds.Local.Key}' from NuGet.config successfully!");
+        });
+        removeCommand.AddCommand(removeLocal);
+
+        // remove myget
+        var removeMyGet = new Command(_appSettings!.NuGetFeeds.MyGet.Command, "Remove MyGet feed");
+        removeMyGet.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(_appSettings!.NuGetFeeds.MyGet.Key))
+            {
+                Console.WriteLine($"Key '{_appSettings!.NuGetFeeds.MyGet.Key}' not found in NuGet.config.");
+                return;
+            }
+            manager.RemoveKey(_appSettings!.NuGetFeeds.MyGet.Key);
+            manager.SaveConfig();
+            Console.WriteLine($"Removed key '{_appSettings!.NuGetFeeds.MyGet.Key}' from NuGet.config successfully!");
+        });
+        removeCommand.AddCommand(removeMyGet);
+
+        // remove custom feeds
+        if (_appSettings!.NuGetFeeds.Custom != null && _appSettings!.NuGetFeeds.Custom.Count > 0)
+        {
+            foreach (var kv in _appSettings!.NuGetFeeds.Custom)
+            {
+                var customFeed = kv.Value;
+                if (string.IsNullOrWhiteSpace(customFeed.Command) || string.IsNullOrWhiteSpace(customFeed.Key))
+                    continue;
+
+                var removeCustom = new Command(customFeed.Command, $"Remove custom feed '{kv.Key}'");
+                removeCustom.SetHandler(() =>
+                {
+                    var manager = new NuGetConfigManager();
+                    if (!manager.ConfigExists)
+                    {
+                        Console.WriteLine("No NuGet.config file found.");
+                        return;
+                    }
+                    if (!manager.KeyExists(customFeed.Key))
+                    {
+                        Console.WriteLine($"Key '{customFeed.Key}' not found in NuGet.config.");
+                        return;
+                    }
+                    manager.RemoveKey(customFeed.Key);
+                    manager.SaveConfig();
+                    Console.WriteLine($"Removed key '{customFeed.Key}' from NuGet.config successfully!");
+                });
+                removeCommand.AddCommand(removeCustom);
+            }
+        }
+
         rootCommand.AddCommand(removeCommand);
 
-        // Disable command
-        var disableCommand = new Command("disable", "Disable a key in existing NuGet.config (comment out)");
-        var disableKeyOption = new Option<string>(
-            name: "--key",
-            description: "The key to disable in NuGet.config"
-        );
-        disableCommand.AddOption(disableKeyOption);
-        disableCommand.SetHandler((string key) =>
+        // Disable command (subcommands like 'add')
+        var disableCommand = new Command("disable", "Disable a feed in existing NuGet.config (comment out)");
+
+        var disableStandard = new Command(_appSettings!.NuGetFeeds.NuGetOrg.Command, "Disable nuget.org feed");
+        disableStandard.AddAlias("default");
+        disableStandard.SetHandler(() =>
         {
             var manager = new NuGetConfigManager();
             if (!manager.ConfigExists)
@@ -625,27 +608,94 @@ class Program
                 Console.WriteLine("No NuGet.config file found.");
                 return;
             }
-
-            if (!manager.KeyExists(key))
+            if (!manager.KeyExists(_appSettings!.NuGetFeeds.NuGetOrg.Key))
             {
-                Console.WriteLine($"Key '{key}' not found in NuGet.config.");
+                Console.WriteLine($"Key '{_appSettings!.NuGetFeeds.NuGetOrg.Key}' not found in NuGet.config.");
                 return;
             }
-
-            manager.DisableKey(key);
+            manager.DisableKey(_appSettings!.NuGetFeeds.NuGetOrg.Key);
             manager.SaveConfig();
-            Console.WriteLine($"Disabled key '{key}' in NuGet.config successfully!");
-        }, disableKeyOption);
+            Console.WriteLine($"Disabled key '{_appSettings!.NuGetFeeds.NuGetOrg.Key}' in NuGet.config successfully!");
+        });
+        disableCommand.AddCommand(disableStandard);
+
+        var disableLocal = new Command(_appSettings!.NuGetFeeds.Local.Command, "Disable local feed");
+        disableLocal.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(_appSettings!.NuGetFeeds.Local.Key))
+            {
+                Console.WriteLine($"Key '{_appSettings!.NuGetFeeds.Local.Key}' not found in NuGet.config.");
+                return;
+            }
+            manager.DisableKey(_appSettings!.NuGetFeeds.Local.Key);
+            manager.SaveConfig();
+            Console.WriteLine($"Disabled key '{_appSettings!.NuGetFeeds.Local.Key}' in NuGet.config successfully!");
+        });
+        disableCommand.AddCommand(disableLocal);
+
+        var disableMyGet = new Command(_appSettings!.NuGetFeeds.MyGet.Command, "Disable MyGet feed");
+        disableMyGet.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(_appSettings!.NuGetFeeds.MyGet.Key))
+            {
+                Console.WriteLine($"Key '{_appSettings!.NuGetFeeds.MyGet.Key}' not found in NuGet.config.");
+                return;
+            }
+            manager.DisableKey(_appSettings!.NuGetFeeds.MyGet.Key);
+            manager.SaveConfig();
+            Console.WriteLine($"Disabled key '{_appSettings!.NuGetFeeds.MyGet.Key}' in NuGet.config successfully!");
+        });
+        disableCommand.AddCommand(disableMyGet);
+
+        if (_appSettings!.NuGetFeeds.Custom != null && _appSettings!.NuGetFeeds.Custom.Count > 0)
+        {
+            foreach (var kv in _appSettings!.NuGetFeeds.Custom)
+            {
+                var feed = kv.Value;
+                if (string.IsNullOrWhiteSpace(feed.Command) || string.IsNullOrWhiteSpace(feed.Key))
+                    continue;
+                var disableCustom = new Command(feed.Command, $"Disable custom feed '{kv.Key}'");
+                disableCustom.SetHandler(() =>
+                {
+                    var manager = new NuGetConfigManager();
+                    if (!manager.ConfigExists)
+                    {
+                        Console.WriteLine("No NuGet.config file found.");
+                        return;
+                    }
+                    if (!manager.KeyExists(feed.Key))
+                    {
+                        Console.WriteLine($"Key '{feed.Key}' not found in NuGet.config.");
+                        return;
+                    }
+                    manager.DisableKey(feed.Key);
+                    manager.SaveConfig();
+                    Console.WriteLine($"Disabled key '{feed.Key}' in NuGet.config successfully!");
+                });
+                disableCommand.AddCommand(disableCustom);
+            }
+        }
+
         rootCommand.AddCommand(disableCommand);
 
-        // Enable command
-        var enableCommand = new Command("enable", "Enable a key in existing NuGet.config (uncomment)");
-        var enableKeyOption = new Option<string>(
-            name: "--key",
-            description: "The key to enable in NuGet.config"
-        );
-        enableCommand.AddOption(enableKeyOption);
-        enableCommand.SetHandler((string key) =>
+        // Enable command (subcommands like 'add')
+        var enableCommand = new Command("enable", "Enable a feed in existing NuGet.config (uncomment)");
+
+        var enableStandard = new Command(_appSettings!.NuGetFeeds.NuGetOrg.Command, "Enable nuget.org feed");
+        enableStandard.AddAlias("default");
+        enableStandard.SetHandler(() =>
         {
             var manager = new NuGetConfigManager();
             if (!manager.ConfigExists)
@@ -653,11 +703,66 @@ class Program
                 Console.WriteLine("No NuGet.config file found.");
                 return;
             }
-
-            manager.EnableKey(key);
+            manager.EnableKey(_appSettings!.NuGetFeeds.NuGetOrg.Key);
             manager.SaveConfig();
-            Console.WriteLine($"Enabled key '{key}' in NuGet.config successfully!");
-        }, enableKeyOption);
+            Console.WriteLine($"Enabled key '{_appSettings!.NuGetFeeds.NuGetOrg.Key}' in NuGet.config successfully!");
+        });
+        enableCommand.AddCommand(enableStandard);
+
+        var enableLocal = new Command(_appSettings!.NuGetFeeds.Local.Command, "Enable local feed");
+        enableLocal.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            manager.EnableKey(_appSettings!.NuGetFeeds.Local.Key);
+            manager.SaveConfig();
+            Console.WriteLine($"Enabled key '{_appSettings!.NuGetFeeds.Local.Key}' in NuGet.config successfully!");
+        });
+        enableCommand.AddCommand(enableLocal);
+
+        var enableMyGet = new Command(_appSettings!.NuGetFeeds.MyGet.Command, "Enable MyGet feed");
+        enableMyGet.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            manager.EnableKey(_appSettings!.NuGetFeeds.MyGet.Key);
+            manager.SaveConfig();
+            Console.WriteLine($"Enabled key '{_appSettings!.NuGetFeeds.MyGet.Key}' in NuGet.config successfully!");
+        });
+        enableCommand.AddCommand(enableMyGet);
+
+        if (_appSettings!.NuGetFeeds.Custom != null && _appSettings!.NuGetFeeds.Custom.Count > 0)
+        {
+            foreach (var kv in _appSettings!.NuGetFeeds.Custom)
+            {
+                var feed = kv.Value;
+                if (string.IsNullOrWhiteSpace(feed.Command) || string.IsNullOrWhiteSpace(feed.Key))
+                    continue;
+                var enableCustom = new Command(feed.Command, $"Enable custom feed '{kv.Key}'");
+                enableCustom.SetHandler(() =>
+                {
+                    var manager = new NuGetConfigManager();
+                    if (!manager.ConfigExists)
+                    {
+                        Console.WriteLine("No NuGet.config file found.");
+                        return;
+                    }
+                    manager.EnableKey(feed.Key);
+                    manager.SaveConfig();
+                    Console.WriteLine($"Enabled key '{feed.Key}' in NuGet.config successfully!");
+                });
+                enableCommand.AddCommand(enableCustom);
+            }
+        }
+
         rootCommand.AddCommand(enableCommand);
     }
 
@@ -671,9 +776,9 @@ class Program
         Console.WriteLine($"  nugetc add {_appSettings!.NuGetFeeds.MyGet.Command,-10} - Add MyGet feed");
         Console.WriteLine();
         Console.WriteLine("Management Commands:");
-        Console.WriteLine("  nugetc remove --key <key>  - Remove a key from existing config");
-        Console.WriteLine("  nugetc disable --key <key> - Disable a key (comment out)");
-        Console.WriteLine("  nugetc enable --key <key>  - Enable a key (uncomment)");
+    Console.WriteLine("  nugetc remove <feed>  - Remove a feed (e.g., local, myget, default)");
+    Console.WriteLine("  nugetc disable <feed> - Disable a feed (comment out)");
+    Console.WriteLine("  nugetc enable <feed>  - Enable a feed (uncomment)");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine($"  --path <path>  - Specify local feed path (default: {_appSettings!.NuGetFeeds.Local.DefaultPath})");
