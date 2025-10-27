@@ -56,7 +56,7 @@ class Program
         rootCommand.AddCommand(readmeCommand);
 
         // Parent 'add' command for adding feeds
-        var addCommand = new Command("add", "Add a feed to NuGet.config (creates file if missing)");
+        var addCommand = new Command("add", "Add a feed to NuGet.config, key only will pick from config, if with value (optionally) updates path/url, or if key doesn't exist, creates it.)");
 
         // Standard (nuget.org) subcommand
         var standardCommand = new Command(_appSettings!.NuGetFeeds.NuGetOrg.Command, "Add nuget.org feed (or create standard config if missing)");
