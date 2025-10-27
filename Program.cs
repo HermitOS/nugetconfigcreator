@@ -156,6 +156,24 @@ class Program
     createCommand.SetHandler(standardHandler);
     rootCommand.AddCommand(createCommand);
 
+    // Top-level 'reset' command - overwrite existing NuGet.config with standard (nuget.org only)
+    var resetConfigCommand = new Command("reset", "Reset NuGet.config to only the standard nuget.org feed (if NuGet.config exists)");
+    resetConfigCommand.SetHandler(() =>
+    {
+        var manager = new NuGetConfigManager();
+        if (!manager.ConfigExists)
+        {
+            Console.WriteLine("No NuGet.config file found. No nuget.config to reset.");
+            return;
+        }
+
+        var template = new StandardNuGetConfigTemplate(_appSettings!.NuGetFeeds);
+        var config = template.GenerateConfig();
+        File.WriteAllText("NuGet.config", config);
+        Console.WriteLine("NuGet.config reset to standard configuration (nuget.org only).");
+    });
+    rootCommand.AddCommand(resetConfigCommand);
+
         // Dynamically add commands for any custom feeds defined in appsettings.json
         if (_appSettings!.NuGetFeeds.Custom != null && _appSettings!.NuGetFeeds.Custom.Count > 0)
         {

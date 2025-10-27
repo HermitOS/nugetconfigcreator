@@ -21,6 +21,22 @@ This isn't just another boring configuration generator - this is a **game-change
 🎭 **Enable/Disable Magic** - Temporarily disable feeds with XML commenting!  
 🗑️ **Easy Cleanup** - Remove keys when you're done debugging!  
 
+### 🎉 **What You Get**
+
+When you run this tool, you'll get a **beautifully formatted, production-ready NuGet.config** file that includes:
+
+- ✅ **Official NuGet.org feed** with proper protocol versioning
+- ✅ **Two extra feeds** one for a local feed at C:\nuget, and one for NUnit's myget feed. (Yeah, we love NUnit)
+- ✅ **Custom feed sources** Add any feed you like, MyGet, Azure Devops, Github, local feeds, company reposits.
+- ✅ **Clean XML structure** that follows Microsoft's best practices
+- ✅ **Proper configuration** that works with all NuGet clients
+- ✅ **No more typos** or missing attributes in your config files!
+- ✅ **Smart overwrites** - You can update the paths of existing feeds!
+- ✅ **Temporary disabling** - comment out feeds after debugging, then re-enable for debugging!
+- ✅ **Easy cleanup** - remove keys when you're done with them!
+
+**Seriously, this tool is so good, you'll wonder how you ever lived without it!** 🎊
+
 ### 🚀 **Real-World Usage Scenarios**
 
 **Creating the nuget.config file**
@@ -48,22 +64,6 @@ nugetc remove local
 nugetc add myget    # First time: "NuGet.config with MyGet.org feed created successfully!"
 nugetc add myget    # Second time: "NuGet.config already exists and contains the 'myget' key."
 ```
-
-### 🎉 **What You Get**
-
-When you run this tool, you'll get a **beautifully formatted, production-ready NuGet.config** file that includes:
-
-- ✅ **Official NuGet.org feed** with proper protocol versioning
-- ✅ **Two extra feeds** one for a local feed at C:\nuget, and one for NUnit's myget feed. (Yeah, we love NUnit)
-- ✅ **Custom feed sources** Add any feed you like, MyGet, Azure Devops, Github, local feeds, company reposits.
-- ✅ **Clean XML structure** that follows Microsoft's best practices
-- ✅ **Proper configuration** that works with all NuGet clients
-- ✅ **No more typos** or missing attributes in your config files!
-- ✅ **Smart overwrites** - You can update the paths of existing feeds!
-- ✅ **Temporary disabling** - comment out feeds after debugging, then re-enable for debugging!
-- ✅ **Easy cleanup** - remove keys when you're done with them!
-
-**Seriously, this tool is so good, you'll wonder how you ever lived without it!** 🎊
 
 ## Installation
 
@@ -148,6 +148,9 @@ nugetc config validate
 
 # Reset tool configuration to factory defaults
 nugetc config reset
+
+# Reset project NuGet.config (if it exists) to only nuget.org
+nugetc reset
 ```
 
 ## Configuration Types
