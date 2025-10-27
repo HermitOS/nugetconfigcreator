@@ -102,6 +102,10 @@ nugetc add myget
 nugetc update local "D:\NewLocalPath"
 nugetc update myget "https://new-myget-url/api/v3/index.json"
 nugetc update github "https://nuget.pkg.github.com/YOUR-USERNAME/index.json"  # For custom feeds
+
+# Add arbitrary feeds directly to NuGet.config (without adding to config first)
+nugetc add CustomFeed "https://custom.example.com/v3/index.json"
+nugetc add LocalFeed2 "C:\MyLocalFeeds"
 ```
 
 ### 🛠️ **Management Commands - The Game Changers!**
@@ -111,28 +115,33 @@ nugetc update github "https://nuget.pkg.github.com/YOUR-USERNAME/index.json"  # 
 nugetc remove local    # Remove local feed
 nugetc remove myget    # Remove MyGet feed
 nugetc remove default  # Remove nuget.org feed
+nugetc remove CustomFeed  # Remove any arbitrary feed
 
 # Update existing feed URLs or paths
 nugetc update local "D:\NewPath"            # Change local feed path
 nugetc update myget "https://new-url.com"   # Change MyGet URL
 nugetc update default "https://custom.org"  # Change nuget.org URL
 nugetc update github "https://new-gh.com"   # Update custom feeds
+nugetc update CustomFeed "https://new.url"  # Update any arbitrary feed
 
 # Temporarily disable a feed (comments it out)
 nugetc disable local
 nugetc disable myget
 nugetc disable default
+nugetc disable CustomFeed  # Disable any arbitrary feed
 
 # Re-enable a disabled feed (uncomments it)
 nugetc enable local
 nugetc enable myget
 nugetc enable default
+nugetc enable CustomFeed  # Enable any arbitrary feed
 
 # Show feed URLs or paths
 nugetc show              # Show all feeds
 nugetc show local        # Show local feed: local: C:\nuget
 nugetc show myget        # Show MyGet feed
 nugetc show default      # Show nuget.org feed
+nugetc show CustomFeed   # Show any arbitrary feed
 
 # Validate configuration (check for collisions and invalid URLs)
 nugetc config validate
@@ -150,10 +159,11 @@ nugetc config validate
 - **Subsequent Runs**: Adds the feed to existing config (if not already present)
 - **Duplicate Detection**: Informs you if the key already exists
 - **Feed Updates**: Use the `update` command to modify existing feed URLs or paths
+- **Arbitrary Feeds**: Add any feed directly with `nugetc add <name> "<url>"` without configuring it first
 
 ## Add more Custom feeds
 
-You can add your own feeds, if three feeds are not enough for you.
+You can add your own feeds to the tool's configuration (appsettings.json) for convenience, or add them directly to NuGet.config.
 
 E.g. a GitHub Packages feed:
 

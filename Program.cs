@@ -210,6 +210,45 @@ class Program
             }
         }
 
+        // Add support for arbitrary key-value pairs (not in config)
+        // Usage: nugetc add <key> <value>
+        var addKeyArg = new Argument<string?>("key", () => null, description: "Feed key/name");
+        var addValueArg = new Argument<string?>("value", () => null, description: "Feed URL or path");
+        addCommand.AddArgument(addKeyArg);
+        addCommand.AddArgument(addValueArg);
+        addCommand.SetHandler((string? key, string? value) =>
+        {
+            // Only handle if both key and value are provided (not a subcommand)
+            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
+            {
+                return; // Let subcommands handle it
+            }
+
+            var manager = new NuGetConfigManager();
+            if (manager.ConfigExists)
+            {
+                if (manager.KeyExists(key))
+                {
+                    Console.WriteLine($"NuGet.config already exists and contains the '{key}' key.");
+                    return;
+                }
+                manager.AddOrUpdateKey(key.ToLowerInvariant(), value);
+                manager.SaveConfig();
+                Console.WriteLine($"Added '{key.ToLowerInvariant()}' key to existing NuGet.config!");
+            }
+            else
+            {
+                // Create base config with just this feed
+                var template = new StandardNuGetConfigTemplate(_appSettings!.NuGetFeeds);
+                var configXml = template.GenerateConfig();
+                File.WriteAllText("NuGet.config", configXml);
+                var manager2 = new NuGetConfigManager();
+                manager2.AddOrUpdateKey(key.ToLowerInvariant(), value);
+                manager2.SaveConfig();
+                Console.WriteLine($"NuGet.config with '{key.ToLowerInvariant()}' feed created successfully!");
+            }
+        }, addKeyArg, addValueArg);
+
         // 'config' command group for managing appsettings.json custom feeds
         var configCommand = new Command("config", "Manage tool configuration (appsettings.json)");
     var configAdd = new Command("add", "Add or update a custom feed in appsettings.json");
@@ -614,6 +653,32 @@ class Program
             }
         }
 
+        // Add support for arbitrary key removal (not necessarily in config)
+        var removeKeyArg = new Argument<string?>("key", () => null, description: "Feed key/name to remove");
+        removeCommand.AddArgument(removeKeyArg);
+        removeCommand.SetHandler((string? key) =>
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return; // Let subcommands handle it
+            }
+
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(key))
+            {
+                Console.WriteLine($"Key '{key}' not found in NuGet.config.");
+                return;
+            }
+            manager.RemoveKey(key);
+            manager.SaveConfig();
+            Console.WriteLine($"Removed key '{key}' from NuGet.config successfully!");
+        }, removeKeyArg);
+
         rootCommand.AddCommand(removeCommand);
 
         // Update command (update existing feed URL/path in NuGet.config)
@@ -719,6 +784,34 @@ class Program
             }
         }
 
+        // Add support for arbitrary key update
+        var updateKeyArg = new Argument<string?>("key", () => null, description: "Feed key/name to update");
+        var updateValueArg = new Argument<string?>("value", () => null, description: "New URL or path");
+        updateCommand.AddArgument(updateKeyArg);
+        updateCommand.AddArgument(updateValueArg);
+        updateCommand.SetHandler((string? key, string? value) =>
+        {
+            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
+            {
+                return; // Let subcommands handle it
+            }
+
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(key))
+            {
+                Console.WriteLine($"Key '{key}' not found in NuGet.config. Use 'nugetc add {key} \"{value}\"' to create it.");
+                return;
+            }
+            manager.AddOrUpdateKey(key, value);
+            manager.SaveConfig();
+            Console.WriteLine($"Updated '{key}' to: {value}");
+        }, updateKeyArg, updateValueArg);
+
         rootCommand.AddCommand(updateCommand);
 
         // Disable command (subcommands like 'add')
@@ -814,6 +907,32 @@ class Program
             }
         }
 
+        // Add support for arbitrary key disable
+        var disableKeyArg = new Argument<string?>("key", () => null, description: "Feed key/name to disable");
+        disableCommand.AddArgument(disableKeyArg);
+        disableCommand.SetHandler((string? key) =>
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return; // Let subcommands handle it
+            }
+
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(key))
+            {
+                Console.WriteLine($"Key '{key}' not found in NuGet.config.");
+                return;
+            }
+            manager.DisableKey(key);
+            manager.SaveConfig();
+            Console.WriteLine($"Disabled key '{key}' in NuGet.config successfully!");
+        }, disableKeyArg);
+
         rootCommand.AddCommand(disableCommand);
 
         // Enable command (subcommands like 'add')
@@ -888,6 +1007,27 @@ class Program
                 enableCommand.AddCommand(enableCustom);
             }
         }
+
+        // Add support for arbitrary key enable
+        var enableKeyArg = new Argument<string?>("key", () => null, description: "Feed key/name to enable");
+        enableCommand.AddArgument(enableKeyArg);
+        enableCommand.SetHandler((string? key) =>
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                return; // Let subcommands handle it
+            }
+
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            manager.EnableKey(key);
+            manager.SaveConfig();
+            Console.WriteLine($"Enabled key '{key}' in NuGet.config successfully!");
+        }, enableKeyArg);
 
         rootCommand.AddCommand(enableCommand);
 
@@ -1019,6 +1159,47 @@ class Program
                 showCommand.AddCommand(showCustom);
             }
         }
+
+        // Add support for arbitrary key show
+        var showKeyArg = new Argument<string?>("key", () => null, description: "Feed key/name to show");
+        showCommand.AddArgument(showKeyArg);
+        showCommand.SetHandler((string? key) =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+
+            // If no key provided, show all feeds (already handled by default handler above)
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                var feeds = manager.GetAllFeeds();
+                if (feeds.Count == 0)
+                {
+                    Console.WriteLine("No feeds found in NuGet.config.");
+                    return;
+                }
+
+                foreach (var feed in feeds)
+                {
+                    Console.WriteLine($"{feed.Key}: {feed.Value}");
+                }
+                return;
+            }
+
+            // Show specific key
+            var value = manager.GetKeyValue(key);
+            if (value != null)
+            {
+                Console.WriteLine($"{key}: {value}");
+            }
+            else
+            {
+                Console.WriteLine($"Feed '{key}' not found in NuGet.config.");
+            }
+        }, showKeyArg);
 
         rootCommand.AddCommand(showCommand);
     }
