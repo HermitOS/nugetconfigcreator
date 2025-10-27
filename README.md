@@ -189,6 +189,9 @@ You can list and rename custom feeds:
 # List all configured feeds (built-in and custom)
 nugetc config list
 
+# Show all configured feeds (same as list, but using show)
+nugetc config show
+
 # Show details of a specific feed in JSON format
 nugetc config show GitHub
 nugetc config show local

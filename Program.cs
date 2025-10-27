@@ -403,14 +403,39 @@ class Program
 
         configCommand.AddCommand(configRename);
 
-        // Show details of a single feed
-    var configShow = new Command("show", "Show details of a specific feed in JSON format");
-    var showNameArg = new Argument<string>("name", description: "Feed name to show");
+        // Show feed details; without a name, show all configured feeds
+    var configShow = new Command("show", "Show configured feeds; without a name, shows all");
+    var showNameArg = new Argument<string?>("name", () => null, description: "Feed name to show");
     configShow.AddArgument(showNameArg);
-        configShow.SetHandler((string name) =>
+        configShow.SetHandler((string? name) =>
         {
             var path = GetAppSettingsPath();
             var settings = LoadAppSettingsFromFile(path);
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                // Show all feeds (same format as 'config list')
+                Console.WriteLine("Built-in feeds:");
+                Console.WriteLine($"  standard/default -> key='{settings.NuGetFeeds.NuGetOrg.Key}', cmd='{settings.NuGetFeeds.NuGetOrg.Command}', url='{settings.NuGetFeeds.NuGetOrg.Url}'");
+                Console.WriteLine($"  local            -> key='{settings.NuGetFeeds.Local.Key}', cmd='{settings.NuGetFeeds.Local.Command}', defaultPath='{settings.NuGetFeeds.Local.DefaultPath}'");
+                Console.WriteLine($"  myget            -> key='{settings.NuGetFeeds.MyGet.Key}', cmd='{settings.NuGetFeeds.MyGet.Command}', url='{settings.NuGetFeeds.MyGet.Url}'");
+                Console.WriteLine();
+
+                Console.WriteLine("Custom feeds:");
+                if (settings.NuGetFeeds.Custom != null && settings.NuGetFeeds.Custom.Count > 0)
+                {
+                    foreach (var kv in settings.NuGetFeeds.Custom)
+                    {
+                        var f = kv.Value;
+                        Console.WriteLine($"  {kv.Key} -> key='{f.Key}', cmd='{f.Command}', url='{f.Url}'");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("  (none)");
+                }
+                return;
+            }
 
             NuGetFeedConfig? feedToShow = null;
             string feedType = "";
@@ -1228,26 +1253,60 @@ class Program
 
     private static void LoadConfiguration()
     {
-        // Before loading, check for a backup file and offer restore if structures match but content differs
+        // Use a version-independent location for backup and version flag
+        var userConfigDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nugetc");
+        Directory.CreateDirectory(userConfigDir);
+        
         var configPath = GetAppSettingsPath();
-        var backupPath = configPath + ".backup";
+        var backupPath = Path.Combine(userConfigDir, "appsettings.json.backup");
+        var versionFlagPath = Path.Combine(userConfigDir, ".version-flag");
+        var currentVersion = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
 
-        if (File.Exists(backupPath) && File.Exists(configPath))
+        bool isFirstRunAfterUpdate = false;
+        if (File.Exists(versionFlagPath))
         {
-            if (TryLoadAppSettingsFromFile(configPath, out var current) && TryLoadAppSettingsFromFile(backupPath, out var backup))
+            var lastVersion = File.ReadAllText(versionFlagPath).Trim();
+            if (lastVersion != currentVersion)
             {
-                if (!AreAppSettingsEquivalent(current, backup))
+                isFirstRunAfterUpdate = true;
+            }
+        }
+        else
+        {
+            // No flag file exists, assume first run
+            isFirstRunAfterUpdate = true;
+        }
+
+        // Auto-restore from backup if this is first run after update and backup exists
+        if (isFirstRunAfterUpdate && File.Exists(backupPath))
+        {
+            if (File.Exists(configPath))
+            {
+                // Compare to see if backup has custom feeds that current doesn't
+                if (TryLoadAppSettingsFromFile(configPath, out var current) && 
+                    TryLoadAppSettingsFromFile(backupPath, out var backup))
                 {
-                    Console.Write($"A backup configuration was found (appsettings.json.backup) that differs from the current configuration. Restore backup? (Y/N): ");
-                    var answer = Console.ReadLine();
-                    if (!string.IsNullOrWhiteSpace(answer) && (answer.StartsWith("Y", StringComparison.OrdinalIgnoreCase)))
+                    var currentCustomCount = current.NuGetFeeds.Custom?.Count ?? 0;
+                    var backupCustomCount = backup.NuGetFeeds.Custom?.Count ?? 0;
+                    
+                    // If backup has custom feeds and current doesn't, or they differ, restore
+                    if (backupCustomCount > 0 || !AreAppSettingsEquivalent(current, backup))
                     {
                         File.Copy(backupPath, configPath, overwrite: true);
-                        Console.WriteLine("Backup restored to appsettings.json.");
+                        Console.WriteLine($"[nugetc] Restored custom feeds from backup (version {currentVersion})");
                     }
                 }
             }
+            else if (File.Exists(backupPath))
+            {
+                // Config missing but backup exists - restore it
+                File.Copy(backupPath, configPath, overwrite: false);
+                Console.WriteLine($"[nugetc] Restored configuration from backup (version {currentVersion})");
+            }
         }
+
+        // Update version flag
+        File.WriteAllText(versionFlagPath, currentVersion);
 
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
@@ -1348,8 +1407,11 @@ class Program
         var json = JsonSerializer.Serialize(settings, options);
         // Save primary file
         File.WriteAllText(path, json);
-        // Also save a backup alongside the primary file
-        var backupPath = path + ".backup";
+        
+        // Save backup to version-independent user directory
+        var userConfigDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nugetc");
+        Directory.CreateDirectory(userConfigDir);
+        var backupPath = Path.Combine(userConfigDir, "appsettings.json.backup");
         File.WriteAllText(backupPath, json);
     }
 }
