@@ -92,7 +92,7 @@ nugetc create
 # Create or add a NuGet.config with local feed (default path: C:\nuget)
 nugetc add local
 
-# Create or add a NuGet.config with local feed at custom path
+# Create or add a NuGet.config with local feed at custom path 
 nugetc add local --path "D:\MyNuGetFeed"
 
 # Note on --path and updates (local feed)
@@ -100,7 +100,7 @@ nugetc add local --path "D:\MyNuGetFeed"
 # - Running without --path preserves the current path (no change).
 # - To start fresh, remove then add: `nugetc remove local` → `nugetc add local --path "D:\NewPath"`
 
-# Create or add a NuGet.config with MyGet.org feed
+# Create or add a NuGet.config with MyGet.org feed  (default path goes to NUnit's Myget feed,override path if you like)
 nugetc add myget
 ```
 
