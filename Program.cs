@@ -639,6 +639,111 @@ class Program
 
         rootCommand.AddCommand(removeCommand);
 
+        // Update command (update existing feed URL/path in NuGet.config)
+        var updateCommand = new Command("update", "Update an existing feed's URL or path in NuGet.config");
+
+        var updateStandard = new Command(_appSettings!.NuGetFeeds.NuGetOrg.Command, "Update nuget.org feed URL");
+        updateStandard.AddAlias("default");
+        var updateStandardArg = new Argument<string>("url", description: "New URL for nuget.org feed");
+        updateStandard.AddArgument(updateStandardArg);
+        updateStandard.SetHandler((string url) =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(_appSettings!.NuGetFeeds.NuGetOrg.Key))
+            {
+                Console.WriteLine($"Key '{_appSettings!.NuGetFeeds.NuGetOrg.Key}' not found in NuGet.config. Use 'nugetc add default' first.");
+                return;
+            }
+            manager.AddOrUpdateKey(_appSettings!.NuGetFeeds.NuGetOrg.Key, url, _appSettings!.NuGetFeeds.NuGetOrg.ProtocolVersion);
+            manager.SaveConfig();
+            Console.WriteLine($"Updated '{_appSettings!.NuGetFeeds.NuGetOrg.Key}' to URL: {url}");
+        }, updateStandardArg);
+        updateCommand.AddCommand(updateStandard);
+
+        var updateLocal = new Command(_appSettings!.NuGetFeeds.Local.Command, "Update local feed path");
+        var updateLocalArg = new Argument<string>("path", description: "New path for local feed");
+        updateLocal.AddArgument(updateLocalArg);
+        updateLocal.SetHandler((string path) =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(_appSettings!.NuGetFeeds.Local.Key))
+            {
+                Console.WriteLine($"Key '{_appSettings!.NuGetFeeds.Local.Key}' not found in NuGet.config. Use 'nugetc add local' first.");
+                return;
+            }
+            manager.AddOrUpdateKey(_appSettings!.NuGetFeeds.Local.Key, path);
+            manager.SaveConfig();
+            Console.WriteLine($"Updated '{_appSettings!.NuGetFeeds.Local.Key}' to path: {path}");
+        }, updateLocalArg);
+        updateCommand.AddCommand(updateLocal);
+
+        var updateMyGet = new Command(_appSettings!.NuGetFeeds.MyGet.Command, "Update MyGet feed URL");
+        var updateMyGetArg = new Argument<string>("url", description: "New URL for MyGet feed");
+        updateMyGet.AddArgument(updateMyGetArg);
+        updateMyGet.SetHandler((string url) =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+            if (!manager.KeyExists(_appSettings!.NuGetFeeds.MyGet.Key))
+            {
+                Console.WriteLine($"Key '{_appSettings!.NuGetFeeds.MyGet.Key}' not found in NuGet.config. Use 'nugetc add myget' first.");
+                return;
+            }
+            manager.AddOrUpdateKey(_appSettings!.NuGetFeeds.MyGet.Key, url);
+            manager.SaveConfig();
+            Console.WriteLine($"Updated '{_appSettings!.NuGetFeeds.MyGet.Key}' to URL: {url}");
+        }, updateMyGetArg);
+        updateCommand.AddCommand(updateMyGet);
+
+        // Dynamic custom feeds
+        if (_appSettings!.NuGetFeeds.Custom != null && _appSettings!.NuGetFeeds.Custom.Count > 0)
+        {
+            foreach (var kv in _appSettings!.NuGetFeeds.Custom)
+            {
+                var customFeed = kv.Value;
+                if (string.IsNullOrWhiteSpace(customFeed.Command) || string.IsNullOrWhiteSpace(customFeed.Key))
+                    continue;
+
+                var updateCustom = new Command(customFeed.Command, $"Update custom feed '{kv.Key}' URL/path");
+                var updateCustomArg = new Argument<string>("value", description: "New URL or path for custom feed");
+                updateCustom.AddArgument(updateCustomArg);
+                updateCustom.SetHandler((string value) =>
+                {
+                    var manager = new NuGetConfigManager();
+                    if (!manager.ConfigExists)
+                    {
+                        Console.WriteLine("No NuGet.config file found.");
+                        return;
+                    }
+                    if (!manager.KeyExists(customFeed.Key))
+                    {
+                        Console.WriteLine($"Key '{customFeed.Key}' not found in NuGet.config. Use 'nugetc add {customFeed.Command}' first.");
+                        return;
+                    }
+                    manager.AddOrUpdateKey(customFeed.Key, value, customFeed.ProtocolVersion);
+                    manager.SaveConfig();
+                    Console.WriteLine($"Updated '{customFeed.Key}' to: {value}");
+                }, updateCustomArg);
+                updateCommand.AddCommand(updateCustom);
+            }
+        }
+
+        rootCommand.AddCommand(updateCommand);
+
         // Disable command (subcommands like 'add')
         var disableCommand = new Command("disable", "Disable a feed in existing NuGet.config (comment out)");
 
@@ -808,6 +913,137 @@ class Program
         }
 
         rootCommand.AddCommand(enableCommand);
+
+        // Show command
+        var showCommand = new Command("show", "Show feed URL or path from NuGet.config");
+
+        // Show without arguments shows all feeds
+        showCommand.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+
+            var feeds = manager.GetAllFeeds();
+            if (feeds.Count == 0)
+            {
+                Console.WriteLine("No feeds found in NuGet.config.");
+                return;
+            }
+
+            foreach (var feed in feeds)
+            {
+                Console.WriteLine($"{feed.Key}: {feed.Value}");
+            }
+        });
+
+        // Show standard/default
+        var showStandard = new Command(_appSettings!.NuGetFeeds.NuGetOrg.Command, "Show nuget.org feed");
+        showStandard.AddAlias("default");
+        showStandard.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+
+            var value = manager.GetKeyValue(_appSettings!.NuGetFeeds.NuGetOrg.Key);
+            if (value != null)
+            {
+                Console.WriteLine($"{_appSettings!.NuGetFeeds.NuGetOrg.Key}: {value}");
+            }
+            else
+            {
+                Console.WriteLine($"Feed '{_appSettings!.NuGetFeeds.NuGetOrg.Key}' not found in NuGet.config.");
+            }
+        });
+        showCommand.AddCommand(showStandard);
+
+        // Show local
+        var showLocal = new Command(_appSettings!.NuGetFeeds.Local.Command, "Show local feed");
+        showLocal.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+
+            var value = manager.GetKeyValue(_appSettings!.NuGetFeeds.Local.Key);
+            if (value != null)
+            {
+                Console.WriteLine($"{_appSettings!.NuGetFeeds.Local.Key}: {value}");
+            }
+            else
+            {
+                Console.WriteLine($"Feed '{_appSettings!.NuGetFeeds.Local.Key}' not found in NuGet.config.");
+            }
+        });
+        showCommand.AddCommand(showLocal);
+
+        // Show MyGet
+        var showMyGet = new Command(_appSettings!.NuGetFeeds.MyGet.Command, "Show MyGet feed");
+        showMyGet.SetHandler(() =>
+        {
+            var manager = new NuGetConfigManager();
+            if (!manager.ConfigExists)
+            {
+                Console.WriteLine("No NuGet.config file found.");
+                return;
+            }
+
+            var value = manager.GetKeyValue(_appSettings!.NuGetFeeds.MyGet.Key);
+            if (value != null)
+            {
+                Console.WriteLine($"{_appSettings!.NuGetFeeds.MyGet.Key}: {value}");
+            }
+            else
+            {
+                Console.WriteLine($"Feed '{_appSettings!.NuGetFeeds.MyGet.Key}' not found in NuGet.config.");
+            }
+        });
+        showCommand.AddCommand(showMyGet);
+
+        // Add custom feeds
+        if (_appSettings!.NuGetFeeds.Custom != null && _appSettings!.NuGetFeeds.Custom.Count > 0)
+        {
+            foreach (var kv in _appSettings!.NuGetFeeds.Custom)
+            {
+                var feed = kv.Value;
+                if (string.IsNullOrWhiteSpace(feed.Command) || string.IsNullOrWhiteSpace(feed.Key))
+                    continue;
+
+                var showCustom = new Command(feed.Command, $"Show custom feed '{kv.Key}'");
+                showCustom.SetHandler(() =>
+                {
+                    var manager = new NuGetConfigManager();
+                    if (!manager.ConfigExists)
+                    {
+                        Console.WriteLine("No NuGet.config file found.");
+                        return;
+                    }
+
+                    var value = manager.GetKeyValue(feed.Key);
+                    if (value != null)
+                    {
+                        Console.WriteLine($"{feed.Key}: {value}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Feed '{feed.Key}' not found in NuGet.config.");
+                    }
+                });
+                showCommand.AddCommand(showCustom);
+            }
+        }
+
+        rootCommand.AddCommand(showCommand);
     }
 
     private static void ShowUsage()

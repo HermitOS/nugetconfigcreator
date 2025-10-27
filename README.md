@@ -23,23 +23,23 @@ This isn't just another boring configuration generator - this is a **game-change
 
 ### 🚀 **Real-World Usage Scenarios**
 
-**Debugging Workflow:**
+**Creating the nuget.config file**
 
 ```bash
-nugetc add myget                # Add debug feed (preconfigured in appsettings.json)
+nugetc create
+```
+
+**Debugging Workflow**
+
+```bash
+nugetc add local                # Add local feed, default to C:\nuget
+nugetc add myget                # Add debug feed to Myget for NUnit(preconfigured in appsettings.json)
 # ... do your debugging magic ...
 nugetc disable myget            # Temporarily disable
 # ... continue development ...
 nugetc enable myget             # Re-enable when needed
 nugetc remove myget             # Clean up when done
-```
-
-**Team Development:**
-
-```bash
-nugetc add local --path "D:\TeamFeed"  # Add team feed
-# ... collaborate with team ...
-nugetc remove local                    # Clean up
+nugetc remove local
 ```
 
 **Smart Duplicate Prevention:**
@@ -95,13 +95,13 @@ nugetc add local
 # Create or add a NuGet.config with local feed at custom path 
 nugetc add local --path "D:\MyNuGetFeed"
 
-# Note on --path and updates (local feed)
-# - If NuGet.config already contains the 'local' feed, running with --path updates the existing path.
-# - Running without --path preserves the current path (no change).
-# - To start fresh, remove then add: `nugetc remove local` → `nugetc add local --path "D:\NewPath"`
-
 # Create or add a NuGet.config with MyGet.org feed  (default path goes to NUnit's Myget feed,override path if you like)
 nugetc add myget
+
+# Update existing feed URLs or paths
+nugetc update local "D:\NewLocalPath"
+nugetc update myget "https://new-myget-url/api/v3/index.json"
+nugetc update github "https://nuget.pkg.github.com/YOUR-USERNAME/index.json"  # For custom feeds
 ```
 
 ### 🛠️ **Management Commands - The Game Changers!**
@@ -112,6 +112,12 @@ nugetc remove local    # Remove local feed
 nugetc remove myget    # Remove MyGet feed
 nugetc remove default  # Remove nuget.org feed
 
+# Update existing feed URLs or paths
+nugetc update local "D:\NewPath"            # Change local feed path
+nugetc update myget "https://new-url.com"   # Change MyGet URL
+nugetc update default "https://custom.org"  # Change nuget.org URL
+nugetc update github "https://new-gh.com"   # Update custom feeds
+
 # Temporarily disable a feed (comments it out)
 nugetc disable local
 nugetc disable myget
@@ -121,6 +127,12 @@ nugetc disable default
 nugetc enable local
 nugetc enable myget
 nugetc enable default
+
+# Show feed URLs or paths
+nugetc show              # Show all feeds
+nugetc show local        # Show local feed: local: C:\nuget
+nugetc show myget        # Show MyGet feed
+nugetc show default      # Show nuget.org feed
 
 # Validate configuration (check for collisions and invalid URLs)
 nugetc config validate
@@ -137,6 +149,7 @@ nugetc config validate
 - **First Run**: Creates a new NuGet.config with the specified feed
 - **Subsequent Runs**: Adds the feed to existing config (if not already present)
 - **Duplicate Detection**: Informs you if the key already exists
+- **Feed Updates**: Use the `update` command to modify existing feed URLs or paths
 
 ## Add more Custom feeds
 

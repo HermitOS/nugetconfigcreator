@@ -38,6 +38,37 @@ public class NuGetConfigManager
             .Any(add => string.Equals(add.Attribute("key")?.Value, key, StringComparison.OrdinalIgnoreCase));
     }
 
+    public string? GetKeyValue(string key)
+    {
+        if (_document == null) return null;
+        
+        var addElement = _document.Descendants("add")
+            .FirstOrDefault(add => string.Equals(add.Attribute("key")?.Value, key, StringComparison.OrdinalIgnoreCase));
+        
+        return addElement?.Attribute("value")?.Value;
+    }
+
+    public Dictionary<string, string> GetAllFeeds()
+    {
+        var feeds = new Dictionary<string, string>();
+        if (_document == null) return feeds;
+
+        var packageSources = _document.Root?.Element("packageSources");
+        if (packageSources == null) return feeds;
+
+        foreach (var add in packageSources.Elements("add"))
+        {
+            var key = add.Attribute("key")?.Value;
+            var value = add.Attribute("value")?.Value;
+            if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value))
+            {
+                feeds[key] = value;
+            }
+        }
+
+        return feeds;
+    }
+
     public void AddOrUpdateKey(string key, string value, string? protocolVersion = null)
     {
         if (_document == null)
