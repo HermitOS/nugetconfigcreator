@@ -214,16 +214,39 @@ class Program
         var configCommand = new Command("config", "Manage tool configuration (appsettings.json)");
     var configAdd = new Command("add", "Add or update a custom feed in appsettings.json");
     var nameArg = new Argument<string>("name", description: "Feed name (e.g., GitHub) - also used as command (lowercase)");
-        var urlOpt = new Option<string>("--url", description: "Feed URL (e.g., https://nuget.pkg.github.com/ORG/index.json)") { IsRequired = true };
-        var protoOpt = new Option<string?>("--protocol-version", () => null, description: "Optional protocol version (e.g., 3)");
+    var urlOpt = new Option<string?>("--url", description: "Feed URL (e.g., https://nuget.pkg.github.com/ORG/index.json or file:///C:/feed)");
+    var pathOpt = new Option<string?>("--path", description: "Local feed path (e.g., C:\\nuget or \\ileserver\\nuget)");
+    var protoOpt = new Option<string?>("--protocol-version", () => null, description: "Optional protocol version (e.g., 3)");
     configAdd.AddArgument(nameArg);
-        configAdd.AddOption(urlOpt);
-        configAdd.AddOption(protoOpt);
-        configAdd.SetHandler((string name, string url, string? protocol) =>
+    configAdd.AddOption(urlOpt);
+    configAdd.AddOption(pathOpt);
+    configAdd.AddOption(protoOpt);
+    configAdd.SetHandler((string name, string? url, string? pathValue, string? protocol) =>
         {
             var path = GetAppSettingsPath();
             var settings = LoadAppSettingsFromFile(path);
             settings.NuGetFeeds.Custom ??= new();
+
+            // Choose source: prefer --path when provided; otherwise use --url
+            string? source = null;
+            if (!string.IsNullOrWhiteSpace(pathValue) && !string.IsNullOrWhiteSpace(url))
+            {
+                Console.WriteLine("Both --url and --path provided; using --path.");
+                source = pathValue;
+            }
+            else if (!string.IsNullOrWhiteSpace(pathValue))
+            {
+                source = pathValue;
+            }
+            else if (!string.IsNullOrWhiteSpace(url))
+            {
+                source = url;
+            }
+            else
+            {
+                Console.WriteLine("You must provide either --url or --path.");
+                return;
+            }
 
             // Command is derived from name (lowercase)
             var command = name.ToLowerInvariant();
@@ -246,12 +269,12 @@ class Program
             {
                 Key = name.ToLowerInvariant(),
                 Command = command,
-                Url = url,
+                Url = source,
                 ProtocolVersion = protocol
             };
             SaveAppSettingsToFile(path, settings);
             Console.WriteLine($"Added/updated custom feed '{name}' with command '{command}'. Restart the tool to use 'nugetc add {command}'.");
-    }, nameArg, urlOpt, protoOpt);
+    }, nameArg, urlOpt, pathOpt, protoOpt);
 
     var configRemove = new Command("remove", "Remove a custom feed from appsettings.json");
     var removeNameArg = new Argument<string>("name", description: "Feed name to remove");

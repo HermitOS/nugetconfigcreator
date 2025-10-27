@@ -146,7 +146,9 @@ E.g. a GitHub Packages feed:
 
 ```bash
 # Add a custom feed to appsettings.json (name is used as command in lowercase)
+# You can specify either --url (HTTP/file URL) or --path (local/UNC). If both are given, --path wins.
 nugetc config add GitHub --url "https://nuget.pkg.github.com/NAMESPACE/index.json"
+nugetc config add MyLocal --path "C:\\Feeds\\Company"
 
 # Then use it to add the feed to NuGet.config (restart the tool first)
 nugetc add github
