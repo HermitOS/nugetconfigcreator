@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Linq;
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using NugetConfigCreator.Templates;
 using NugetConfigCreator.Configuration;
@@ -19,6 +20,8 @@ class Program
         LoadConfiguration();
 
     var rootCommand = new RootCommand("NuGet Config Creator - Generate and manage NuGet.config feeds");
+        // Ensure help shows the installed tool name, not the program class
+        rootCommand.Name = "nugetc";
 
         // Create commands dynamically from configuration
         CreateDynamicCommands(rootCommand);
@@ -34,6 +37,24 @@ class Program
 
     private static void CreateDynamicCommands(RootCommand rootCommand)
     {
+        // 'readme' command - open project README in default browser
+        var readmeCommand = new Command("readme", "Open the project README in your browser");
+        readmeCommand.SetHandler(() =>
+        {
+            var url = "https://github.com/HermitOS/nugetconfigcreator#readme";
+            try
+            {
+                var psi = new ProcessStartInfo { FileName = url, UseShellExecute = true };
+                Process.Start(psi);
+                Console.WriteLine("See separate opened browser.");
+            }
+            catch
+            {
+                Console.WriteLine($"README: {url}");
+            }
+        });
+        rootCommand.AddCommand(readmeCommand);
+
         // Parent 'add' command for adding feeds
         var addCommand = new Command("add", "Add a feed to NuGet.config (creates file if missing)");
 
