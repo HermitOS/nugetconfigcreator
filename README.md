@@ -159,11 +159,11 @@ E.g. a GitHub Packages feed:
 
 ```bash
 # Add a custom feed to appsettings.json (name is used as command in lowercase)
-# You can specify either --url (HTTP/file URL) or --path (local/UNC). If both are given, --path wins.
-nugetc config add GitHub --url "https://nuget.pkg.github.com/NAMESPACE/index.json"
-nugetc config add MyLocal --path "C:\\Feeds\\Company"
+# Specify the URL or local path as the second argument
+nugetc config add GitHub "https://nuget.pkg.github.com/NAMESPACE/index.json"
+nugetc config add MyLocal "C:\\Feeds\\Company"
 
-# Then use it to add the feed to NuGet.config (restart the tool first)
+# Then use it to add the feed to NuGet.config
 nugetc add github
 ```
 
@@ -172,8 +172,6 @@ You can remove it from the tool configuration later:
 ```bash
 nugetc config remove GitHub
 ```
-
-Note: newly added commands appear on the next run because commands are generated from appsettings.json at startup.
 
 You can list and rename custom feeds:
 
