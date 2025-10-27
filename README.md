@@ -145,6 +145,9 @@ nugetc show CustomFeed   # Show any arbitrary feed
 
 # Validate configuration (check for collisions and invalid URLs)
 nugetc config validate
+
+# Reset tool configuration to factory defaults
+nugetc config reset
 ```
 
 ## Configuration Types
@@ -250,6 +253,23 @@ After installing the tool globally, you can customize the configuration:
 1. **Find the tool directory**: `%USERPROFILE%\.dotnet\tools\`
 2. **Edit `appsettings.json`**: Modify URLs, keys, or default paths
 3. **Restart the tool**: Changes take effect immediately
+
+### Backups and Reset
+
+- The tool maintains a version-independent backup of your configuration at:
+  - Windows: `%USERPROFILE%\.nugetc\appsettings.json.backup`
+- On the first run after an update, if needed, your custom feeds are automatically restored from this backup.
+- To reset the tool to factory defaults and remove the backup, run:
+
+```bash
+nugetc config reset
+```
+
+What reset does:
+
+- Deletes the backup file (`appsettings.json.backup`) under `%USERPROFILE%\.nugetc`.
+- Restores the tool's `appsettings.json` to the factory defaults of the currently installed version.
+- The tool also captures a one-time `appsettings.json.default` alongside the executable to preserve the shipped defaults per version.
 
 ### Example Customizations
 

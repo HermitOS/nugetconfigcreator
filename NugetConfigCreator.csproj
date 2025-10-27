@@ -7,8 +7,8 @@
     <Nullable>enable</Nullable>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>nugetc</ToolCommandName>
-    <PackageId>nugetc</PackageId>
-    <Version>0.1.14</Version>
+  <PackageId>nugetc</PackageId>
+  <Version>0.1.15</Version>
     <Authors>Terje Sandstrom</Authors>
     <Copyright>Copyright © 2025 Terje Sandstrom</Copyright>
     <Description>A .NET tool for creating NuGet.config files with different feed configurations</Description>

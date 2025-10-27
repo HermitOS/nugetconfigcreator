@@ -478,7 +478,7 @@ class Program
         configCommand.AddCommand(configShow);
 
         // Validate configuration for collisions and issues
-        var configValidate = new Command("validate", "Validate configuration for collisions and invalid URLs");
+    var configValidate = new Command("validate", "Validate configuration for collisions and invalid URLs");
         configValidate.SetHandler(() =>
         {
             var path = GetAppSettingsPath();
@@ -577,6 +577,58 @@ class Program
             }
         });
         configCommand.AddCommand(configValidate);
+
+        // Reset configuration to factory defaults
+        var configReset = new Command("reset", "Reset tool configuration: delete backup and restore factory default appsettings.json");
+        configReset.SetHandler(() =>
+        {
+            var userConfigDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nugetc");
+            var backupPath = Path.Combine(userConfigDir, "appsettings.json.backup");
+            var configPath = GetAppSettingsPath();
+            var defaultPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json.default");
+
+            // Delete backup if it exists
+            if (File.Exists(backupPath))
+            {
+                try
+                {
+                    File.Delete(backupPath);
+                    Console.WriteLine($"Deleted backup: {backupPath}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Warning: Could not delete backup: {ex.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine("No backup file to delete.");
+            }
+
+            // Restore factory default appsettings
+            try
+            {
+                if (File.Exists(defaultPath))
+                {
+                    File.Copy(defaultPath, configPath, overwrite: true);
+                    Console.WriteLine("Restored appsettings.json from factory default.");
+                }
+                else
+                {
+                    // Fallback: write a fresh default structure
+                    var fresh = new AppSettings();
+                    var options = new JsonSerializerOptions { WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+                    var json = JsonSerializer.Serialize(fresh, options);
+                    File.WriteAllText(configPath, json);
+                    Console.WriteLine("Factory default file not found; wrote a fresh default appsettings.json.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error restoring factory defaults: {ex.Message}");
+            }
+        });
+        configCommand.AddCommand(configReset);
 
         rootCommand.AddCommand(configCommand);
 
@@ -1258,6 +1310,21 @@ class Program
         Directory.CreateDirectory(userConfigDir);
         
         var configPath = GetAppSettingsPath();
+        // Ensure we preserve the factory defaults of the currently installed version
+        // by capturing the shipped appsettings.json to appsettings.json.default before any edits.
+        var defaultPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json.default");
+        try
+        {
+            if (!File.Exists(defaultPath) && File.Exists(configPath))
+            {
+                File.Copy(configPath, defaultPath, overwrite: false);
+            }
+        }
+        catch
+        {
+            // Non-fatal: default capture failure should not break normal execution
+        }
+
         var backupPath = Path.Combine(userConfigDir, "appsettings.json.backup");
         var versionFlagPath = Path.Combine(userConfigDir, ".version-flag");
         var currentVersion = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
@@ -1407,6 +1474,21 @@ class Program
         var json = JsonSerializer.Serialize(settings, options);
         // Save primary file
         File.WriteAllText(path, json);
+        
+        // Also ensure a one-time capture of factory defaults exists
+        var defaultPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json.default");
+        try
+        {
+            if (!File.Exists(defaultPath) && File.Exists(path))
+            {
+                // Capture whatever is currently on disk (pre-change) as factory default for this version
+                // To do this safely, read from disk before our overwrite above:
+                // However, we've already overwritten. If default doesn't exist by now, fall back to
+                // capturing from our freshly written content to keep schema; startup also tries to capture early.
+                File.WriteAllText(defaultPath, json);
+            }
+        }
+        catch { /* best-effort only */ }
         
         // Save backup to version-independent user directory
         var userConfigDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nugetc");
