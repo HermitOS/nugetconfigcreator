@@ -35,6 +35,13 @@ When you run this tool, you'll get a **beautifully formatted, production-ready N
 - ✅ **Temporary disabling** - comment out feeds after debugging, then re-enable for debugging!
 - ✅ **Easy cleanup** - remove keys when you're done with them!
 
+### **And for configuration**
+
+- ✅ **Command Flexibility** The Command property defines the CLI command name
+- ✅ **Easy Customization** Add new feeds by adding entries to NuGetFeeds
+- ✅ **User-Friendly Commands** Choose command names that make sense for your organization
+- ✅ **Multiple Feeds** Add as many custom feeds as needed
+
 **Seriously, this tool is so good, you'll wonder how you ever lived without it!** 🎊
 
 ### 🚀 **Real-World Usage Scenarios**
@@ -155,19 +162,15 @@ nugetc reset
 
 ## Configuration Types
 
-1. **Standard (alias: default)**: Creates a basic NuGet.config with only the official nuget.org feed. Invoke with `nugetc add default` (or `nugetc add standard`).
-2. **Local**: Adds a local feed source (default: C:\nuget, customizable via --path parameter)
-3. **MyGet**: Adds MyGet.org feed source (NUnit feed)
+The tool comes with three built-in feed configurations:
 
-### 🧠 **Smart Behavior**
+### Default Configuration
 
-- **First Run**: Creates a new NuGet.config with the specified feed
-- **Subsequent Runs**: Adds the feed to existing config (if not already present)
-- **Duplicate Detection**: Informs you if the key already exists
-- **Feed Updates**: Use the `update` command to modify existing feed URLs or paths
-- **Arbitrary Feeds**: Add any feed directly with `nugetc add <name> "<url>"` without configuring it first
+1. **default** (alias: `standard`) - `https://api.nuget.org/v3/index.json`
+2. **local** - `C:\nuget` (customizable via `--path`)
+3. **myget** - `https://www.myget.org/F/nunit/api/v3/index.json`
 
-## Add more Custom feeds
+### Add more Custom feeds
 
 You can add your own feeds to the tool's configuration (appsettings.json) for convenience, or add them directly to NuGet.config.
 
@@ -210,115 +213,14 @@ nugetc config validate
 nugetc config rename GitHub GitHubEnterprise
 ```
 
-## Configuration
+### Backups and Reset to factory defaults
 
-The tool uses `appsettings.json` for configuration, making it easy to customize feed URLs without recompiling.
+The tool maintains a version-independent backup of your configuration., ensuring you keep it when updating the tool.
 
-### Default Configuration
-
-The tool comes with sensible defaults in `appsettings.json`:
-
-```json
-{
-  "NuGetFeeds": {
-    "NuGetOrg": {
-      "Key": "nuget.org",
-      "Command": "standard",
-      "Url": "https://api.nuget.org/v3/index.json",
-      "ProtocolVersion": "3"
-    },
-    "MyGet": {
-      "Key": "MyGet",
-      "Command": "myget",
-      "Url": "https://www.myget.org/F/nunit/api/v3/index.json"
-    },
-    "Local": {
-      "Key": "Local",
-      "Command": "local",
-      "DefaultPath": "C:\\nuget"
-    }
-  }
-}
-```
-
-### Key Features
-
-- **Command Flexibility**: The `Command` property defines the CLI command name
-- **Easy Customization**: Add new feeds by adding entries to `NuGetFeeds`
-- **User-Friendly Commands**: Choose command names that make sense for your organization
-- **Multiple Feeds**: Add as many custom feeds as needed
-- **Hot Reload**: Configuration changes take effect immediately
-
-### Customizing Configuration
-
-After installing the tool globally, you can customize the configuration:
-
-1. **Find the tool directory**: `%USERPROFILE%\.dotnet\tools\`
-2. **Edit `appsettings.json`**: Modify URLs, keys, or default paths
-3. **Restart the tool**: Changes take effect immediately
-
-### Backups and Reset
-
-- The tool maintains a version-independent backup of your configuration at:
-  - Windows: `%USERPROFILE%\.nugetc\appsettings.json.backup`
-- On the first run after an update, if needed, your custom feeds are automatically restored from this backup.
-- To reset the tool to factory defaults and remove the backup, run:
+However you might not want to keep it, but restore to factory defaults, that is when you use the `reset` command.
 
 ```bash
 nugetc config reset
-```
-
-What reset does:
-
-- Deletes the backup file (`appsettings.json.backup`) under `%USERPROFILE%\.nugetc`.
-- Restores the tool's `appsettings.json` to the factory defaults of the currently installed version.
-- The tool also captures a one-time `appsettings.json.default` alongside the executable to preserve the shipped defaults per version.
-
-### Example Customizations
-
-**Add a custom MyGet feed:**
-
-```json
-"MyGet": {
-  "Key": "MyCustomFeed",
-  "Command": "custom",
-  "Url": "https://www.myget.org/F/my-company/api/v3/index.json"
-}
-```
-
-**Change command names:**
-
-```json
-"MyGet": {
-  "Key": "MyGet",
-  "Command": "nunit",
-  "Url": "https://www.myget.org/F/nunit/api/v3/index.json"
-}
-```
-
-**Add multiple custom feeds:**
-
-```json
-"CompanyFeed": {
-  "Key": "Company",
-  "Command": "company",
-  "Url": "https://nuget.company.com/v3/index.json"
-},
-"DevFeed": {
-  "Key": "Dev",
-  "Command": "dev",
-  "Url": "https://dev.nuget.company.com/v3/index.json"
-}
-```
-
-**Change default local path:**
-
-```json
-"Local": {
-  "Key": "Local",
-  "Command": "local",
-  "DefaultPath": "D:\\MyNuGetFeeds"
-}
 ```
 
 ## 🎊 **Amazing Output - See the Magic Happen!**
